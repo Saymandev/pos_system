@@ -2,7 +2,6 @@
 
 import DashboardLayout from '@/components/ui/DashboardLayout'
 import { useSettings } from '@/contexts/SettingsContext'
-import { setGlobalCurrency } from '@/lib/utils'
 import { BellIcon, BuildingStorefrontIcon, CloudArrowDownIcon, Cog6ToothIcon, CurrencyDollarIcon, ShieldCheckIcon } from '@heroicons/react/24/outline'
 import { useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
@@ -43,12 +42,7 @@ export default function SettingsPage() {
     requireConfirmation: true,
   })
 
-  // Update global currency when settings change
-  useEffect(() => {
-    if (settings?.currency) {
-      setGlobalCurrency(settings.currency)
-    }
-  }, [settings?.currency])
+  // Currency is now automatically updated in SettingsContext
 
   // Initialize form with settings data
   useEffect(() => {
@@ -100,7 +94,7 @@ export default function SettingsPage() {
       await updateSettings(data)
       // Update global currency immediately if currency was changed
       if (data.currency) {
-        setGlobalCurrency(data.currency)
+        // Currency is automatically set in SettingsContext
       }
     } catch (error) {
       console.error(`Error saving ${section}:`, error)

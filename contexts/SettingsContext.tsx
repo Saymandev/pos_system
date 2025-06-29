@@ -1,5 +1,6 @@
 'use client'
 
+import { setGlobalCurrency } from '@/lib/utils'
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
 
@@ -58,7 +59,7 @@ const defaultSettings: Settings = {
   taxName: 'Sales Tax',
   includeTaxInPrice: false,
   roundTax: true,
-  currency: 'USD',
+  currency: 'BDT',
   dateFormat: 'MM/dd/yyyy',
   timeFormat: '12h',
   orderNumberPrefix: 'ORD',
@@ -80,9 +81,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         const data = await response.json()
         setSettings(data)
+        // Update global currency whenever settings are loaded
+        if (data.currency) {
+          setGlobalCurrency(data.currency)
+        }
       } else {
         console.error('Failed to fetch settings')
         setSettings(defaultSettings)
+        // Set default currency
+        setGlobalCurrency(defaultSettings.currency)
       }
     } catch (error) {
       console.error('Error fetching settings:', error)
@@ -105,6 +112,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         const updatedSettings = await response.json()
         setSettings(updatedSettings)
+        // Update global currency when settings are updated
+        if (updatedSettings.currency) {
+          setGlobalCurrency(updatedSettings.currency)
+        }
         toast.success('Settings saved successfully!')
       } else {
         throw new Error('Failed to save settings')

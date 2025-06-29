@@ -1,8 +1,10 @@
 'use client'
 
+import { useSettings } from '@/contexts/SettingsContext'
 import { formatPrice } from '@/lib/utils'
 import { BanknotesIcon, ClockIcon, CreditCardIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useState } from 'react'
+import InvoiceModal from './InvoiceModal'
 
 interface CartItem {
   id: string
@@ -29,17 +31,55 @@ interface PaymentModalProps {
   onSuccess: () => void
 }
 
+interface Order {
+  id: string
+  orderNumber: string
+  status: string
+  paymentType: 'CASH' | 'CARD' | 'DUE'
+  subtotal: number
+  tax: number
+  discount: number
+  total: number
+  notes?: string
+  createdAt: string
+  user: {
+    id: string
+    name: string
+  }
+  orderItems: Array<{
+    id: string
+    quantity: number
+    price: number
+    subtotal: number
+    item: {
+      id: string
+      name: string
+      price: number
+    }
+  }>
+}
+
 export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalProps) {
   const [paymentType, setPaymentType] = useState<'CASH' | 'CARD' | 'DUE'>('CASH')
   const [notes, setNotes] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [showInvoice, setShowInvoice] = useState(false)
+  const [completedOrder, setCompletedOrder] = useState<Order | null>(null)
+  const { settings } = useSettings()
 
   const handlePayment = async () => {
     setIsProcessing(true)
     
     try {
-      await cart.processOrder(paymentType, notes || undefined)
-      onSuccess()
+      const order = await cart.processOrder(paymentType, notes || undefined)
+      setCompletedOrder(order)
+      
+      // Check if auto-print is enabled in settings
+      if (settings?.printReceipts) {
+        setShowInvoice(true)
+      } else {
+        onSuccess()
+      }
     } catch (error: any) {
       console.error('Payment failed:', error)
       alert('Payment failed: ' + error.message)
@@ -197,10 +237,25 @@ export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalP
           
           {/* Receipt Preview */}
           <p className="text-sm text-gray-600 text-center mt-4">
-            Receipt will be generated after payment completion
+            {settings?.printReceipts ? 
+              'Receipt will be printed automatically after payment' : 
+              'Receipt will be available after payment completion'
+            }
           </p>
         </div>
       </div>
+
+      {/* Invoice Modal */}
+      {showInvoice && completedOrder && (
+        <InvoiceModal
+          order={completedOrder}
+          onClose={() => {
+            setShowInvoice(false)
+            onSuccess()
+          }}
+          autoPrint={settings?.printReceipts || false}
+        />
+      )}
     </div>
   )
 } 

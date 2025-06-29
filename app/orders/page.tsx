@@ -1,8 +1,9 @@
 'use client'
 
+import InvoiceModal from '@/components/pos/InvoiceModal'
 import DashboardLayout from '@/components/ui/DashboardLayout'
 import { formatPrice } from '@/lib/utils'
-import { ArrowDownIcon, ArrowUpIcon, ClipboardDocumentListIcon, EyeIcon, FunnelIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import { ArrowDownIcon, ArrowUpIcon, ClipboardDocumentListIcon, EyeIcon, FunnelIcon, MagnifyingGlassIcon, PrinterIcon } from '@heroicons/react/24/outline'
 import { useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
 
@@ -45,6 +46,8 @@ export default function OrdersPage() {
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [showInvoice, setShowInvoice] = useState(false)
+  const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   
   // Filters
@@ -197,6 +200,11 @@ export default function OrdersPage() {
   const viewOrderDetails = (order: Order) => {
     setSelectedOrder(order)
     setShowOrderDetails(true)
+  }
+
+  const printInvoice = (order: Order) => {
+    setInvoiceOrder(order)
+    setShowInvoice(true)
   }
 
   if (isLoading) {
@@ -590,13 +598,22 @@ export default function OrdersPage() {
                         {formatPrice(order.total)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => viewOrderDetails(order)}
-                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
-                          title="View details"
-                        >
-                          <EyeIcon className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => viewOrderDetails(order)}
+                            className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+                            title="View details"
+                          >
+                            <EyeIcon className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => printInvoice(order)}
+                            className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
+                            title="Print invoice"
+                          >
+                            <PrinterIcon className="w-5 h-5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -724,9 +741,41 @@ export default function OrdersPage() {
                   </div>
                 </div>
               )}
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setSelectedOrder(null)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    printInvoice(selectedOrder)
+                    setSelectedOrder(null)
+                  }}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+                >
+                  <PrinterIcon className="w-4 h-4" />
+                  <span>Print Invoice</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Invoice Modal */}
+      {showInvoice && invoiceOrder && (
+        <InvoiceModal
+          order={invoiceOrder}
+          onClose={() => {
+            setShowInvoice(false)
+            setInvoiceOrder(null)
+          }}
+          autoPrint={false}
+        />
       )}
     </DashboardLayout>
   )

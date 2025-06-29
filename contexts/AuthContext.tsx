@@ -92,11 +92,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       // Handle error silently
     } finally {
+      // Clear all local state and storage
       setState({
         user: null,
         isLoading: false,
         isAuthenticated: false,
       })
+      
+      // Clear any cached data
+      localStorage.clear()
+      sessionStorage.clear()
+      
+      // Force page reload to ensure complete cleanup
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
     }
   }
 

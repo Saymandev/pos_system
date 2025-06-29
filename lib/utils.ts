@@ -15,10 +15,15 @@ const currencySymbols: { [key: string]: string } = {
 }
 
 // Global currency setting - will be updated by settings context
-let globalCurrency = 'USD'
+let globalCurrency = 'BDT'
 
 export function setGlobalCurrency(currency: string) {
   globalCurrency = currency
+}
+
+export function getCurrencySymbol(currency?: string): string {
+  const useCurrency = currency || globalCurrency
+  return currencySymbols[useCurrency] || useCurrency
 }
 
 export function formatPrice(price: number, currency?: string): string {

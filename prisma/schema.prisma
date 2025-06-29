@@ -127,7 +127,7 @@ model Settings {
   roundTax           Boolean  @default(true)
   
   // System Preferences
-  currency           String   @default("USD")
+  currency           String   @default("BDT")
   dateFormat         String   @default("MM/dd/yyyy")
   timeFormat         String   @default("12h")
   orderNumberPrefix  String   @default("ORD")

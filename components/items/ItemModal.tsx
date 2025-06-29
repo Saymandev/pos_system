@@ -1,5 +1,6 @@
 'use client'
 
+import { getCurrencySymbol } from '@/lib/utils'
 import { CameraIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useEffect, useRef, useState } from 'react'
 
@@ -212,7 +213,7 @@ export default function ItemModal({ item, categories, onSave, onClose }: ItemMod
                   Price *
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-3 text-gray-500">$</span>
+                  <span className="absolute left-3 top-3 text-gray-500">{getCurrencySymbol()}</span>
                   <input
                     type="number"
                     value={formData.price}
