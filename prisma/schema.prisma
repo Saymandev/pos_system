@@ -1,0 +1,149 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      UserRole @default(STAFF)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  orders    Order[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  color       String   @default("#3b82f6")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  items       Item[]
+
+  @@map("categories")
+}
+
+model Item {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  image       String?
+  isAvailable Boolean   @default(true)
+  categoryId  String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  category    Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
+
+  @@map("items")
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique
+  status      OrderStatus @default(PENDING)
+  paymentType PaymentType
+  subtotal    Float
+  tax         Float       @default(0)
+  discount    Float       @default(0)
+  total       Float
+  notes       String?
+  userId      String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  // Relations
+  user        User        @relation(fields: [userId], references: [id])
+  orderItems  OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id       String @id @default(cuid())
+  quantity Int
+  price    Float
+  subtotal Float
+  orderId  String
+  itemId   String
+  
+  // Relations
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item     Item   @relation(fields: [itemId], references: [id])
+
+  @@map("order_items")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model Settings {
+  id                 String   @id @default(cuid())
+  // Restaurant Information
+  restaurantName     String   @default("Restaurant POS")
+  address            String   @default("123 Main Street")
+  city               String   @default("New York")
+  state              String   @default("NY")
+  zipCode            String   @default("10001")
+  phone              String   @default("(555) 123-4567")
+  email              String   @default("info@restaurant.com")
+  website            String   @default("www.restaurant.com")
+  timezone           String   @default("America/New_York")
+  
+  // Tax Settings
+  taxRate            Float    @default(8.875)
+  taxName            String   @default("Sales Tax")
+  includeTaxInPrice  Boolean  @default(false)
+  roundTax           Boolean  @default(true)
+  
+  // System Preferences
+  currency           String   @default("USD")
+  dateFormat         String   @default("MM/dd/yyyy")
+  timeFormat         String   @default("12h")
+  orderNumberPrefix  String   @default("ORD")
+  enableNotifications Boolean @default(true)
+  autoBackup         Boolean  @default(true)
+  printReceipts      Boolean  @default(true)
+  requireConfirmation Boolean @default(true)
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("settings")
+}
+
+enum PaymentType {
+  CASH
+  CARD
+  DUE
+} 
