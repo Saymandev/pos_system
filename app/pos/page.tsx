@@ -8,7 +8,7 @@ import { useSettings } from '@/contexts/SettingsContext'
 import { useSocket } from '@/contexts/SocketContext'
 import { useSystemPreferences } from '@/lib/useSystemPreferences'
 import { formatPrice } from '@/lib/utils'
-import { ArrowLeftIcon, Bars3Icon, MagnifyingGlassIcon, MinusIcon, PlusIcon, ShoppingCartIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { ArrowLeftIcon, Bars3Icon, ListBulletIcon, MagnifyingGlassIcon, MinusIcon, PlusIcon, ShoppingCartIcon, Squares2X2Icon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -43,6 +43,7 @@ export default function POSPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showCategories, setShowCategories] = useState(false)
   const [showCart, setShowCart] = useState(false)
+  const [viewType, setViewType] = useState<'card' | 'list'>('card')
   
   const cart = useCart()
   const router = useRouter()
@@ -72,10 +73,8 @@ export default function POSPage() {
         setCategories(categoriesData)
         setItems(availableItems)
         
-        if (categoriesData.length > 0) {
-          setSelectedCategory(categoriesData[0].id)
-        }
-
+        // Keep selectedCategory as null so "All Items" stays selected by default
+        
         showSuccessNotification('Menu loaded successfully!')
       } catch (error) {
         console.error('Failed to fetch data:', error)
@@ -526,9 +525,36 @@ export default function POSPage() {
                   }
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500">Welcome back,</p>
-                <p className="font-semibold text-gray-900">{user?.name || 'User'}</p>
+              <div className="flex items-center space-x-4">
+                {/* View Toggle */}
+                <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setViewType('card')}
+                    className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      viewType === 'card'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Squares2X2Icon className="w-4 h-4" />
+                    <span>Cards</span>
+                  </button>
+                  <button
+                    onClick={() => setViewType('list')}
+                    className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      viewType === 'list'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <ListBulletIcon className="w-4 h-4" />
+                    <span>List</span>
+                  </button>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500">Welcome back,</p>
+                  <p className="font-semibold text-gray-900">{user?.name || 'User'}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -542,12 +568,37 @@ export default function POSPage() {
                   : `All Items - ${filteredItems.length} items`
                 }
               </p>
-              <button
-                onClick={() => setShowCategories(true)}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium bg-blue-50 px-2 py-1 rounded"
-              >
-                All Categories
-              </button>
+              <div className="flex items-center space-x-2">
+                {/* Mobile View Toggle */}
+                <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setViewType('card')}
+                    className={`p-1.5 rounded text-xs transition-colors ${
+                      viewType === 'card'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    <Squares2X2Icon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewType('list')}
+                    className={`p-1.5 rounded text-xs transition-colors ${
+                      viewType === 'list'
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    <ListBulletIcon className="w-4 h-4" />
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowCategories(true)}
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium bg-blue-50 px-2 py-1 rounded"
+                >
+                  All Categories
+                </button>
+              </div>
             </div>
             
             {/* Horizontal Scrollable Categories */}
@@ -555,7 +606,10 @@ export default function POSPage() {
               <div className="flex space-x-2 pb-2">
                 {/* All Items Chip */}
                 <button
-                  onClick={() => setSelectedCategory(null)}
+                  onClick={() => {
+                    setSelectedCategory(null)
+                    setSearchTerm('')
+                  }}
                   className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-medium transition-colors ${
                     selectedCategory === null
                       ? 'bg-blue-600 text-white'
@@ -569,7 +623,10 @@ export default function POSPage() {
                 {categories.map((category) => (
                   <button
                     key={category.id}
-                    onClick={() => setSelectedCategory(category.id)}
+                    onClick={() => {
+                      setSelectedCategory(category.id)
+                      setSearchTerm('')
+                    }}
                     className={`flex-shrink-0 px-3 py-2 rounded-full text-xs font-medium transition-colors border-2 ${
                       selectedCategory === category.id
                         ? 'text-white border-white/30'
@@ -607,128 +664,187 @@ export default function POSPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3  lg:grid-cols-1 xl:grid-cols-3  gap-3 lg:gap-6 pb-10">
-                {filteredItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="group bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-2 border border-gray-100 hover:border-gray-200 overflow-hidden relative"
-                    onClick={() => handleAddToCart(item)}
-                  >
-                    {/* Category Color Indicator */}
-                    <div 
-                      className="absolute top-0 left-0 right-0 h-1 z-10"
-                      style={{ backgroundColor: item.category.color }}
-                    />
+              <>
+                {/* Card View */}
+                {viewType === 'card' && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-5 pb-10">
+                    {filteredItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="group bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 hover:border-gray-200 overflow-hidden relative cursor-pointer"
+                        onClick={() => handleAddToCart(item)}
+                      >
+                        {/* Category Color Indicator */}
+                        <div 
+                          className="absolute top-0 left-0 right-0 h-1 z-10"
+                          style={{ backgroundColor: item.category.color }}
+                        />
 
-                    {/* Item Image */}
-                    <div className="aspect-square bg-gradient-to-br from-gray-50 via-gray-100 to-gray-150 rounded-t-3xl relative overflow-hidden">
-                      {item.image ? (
-                        <>
-                          <img 
-                            src={item.image} 
-                            alt={item.name}
-                            className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
-                          />
-                          {/* Image Overlay Gradient */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        </>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 via-gray-50 to-white">
-                          <div className="text-gray-300 group-hover:text-gray-400 transition-all duration-300 transform group-hover:scale-110">
-                            <svg className="w-12 h-12 lg:w-16 lg:h-16" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                            </svg>
+                        {/* Item Image */}
+                        <div className="aspect-[4/3] bg-gradient-to-br from-gray-50 via-gray-100 to-gray-150 relative overflow-hidden">
+                          {item.image ? (
+                            <>
+                              <img 
+                                src={item.image} 
+                                alt={item.name}
+                                className="w-full h-full object-cover transition-all duration-300 group-hover:scale-105"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            </>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 via-gray-50 to-white">
+                              <div className="text-gray-300 group-hover:text-gray-400 transition-colors duration-300">
+                                <svg className="w-10 h-10 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Availability Badge */}
+                          <div className="absolute top-2 left-2">
+                            <div className="flex items-center space-x-1 bg-green-500/90 backdrop-blur-sm text-white px-2 py-1 rounded-full text-xs font-medium">
+                              <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                              <span>Available</span>
+                            </div>
                           </div>
                         </div>
-                      )}
-                      
-                      {/* Floating Add Button */}
-                      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transform scale-50 group-hover:scale-100 transition-all duration-300">
-                        <button 
-                          className="bg-white/90 backdrop-blur-sm hover:bg-white text-green-600 p-2 lg:p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 border border-green-100 hover:border-green-200"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleAddToCart(item)
-                          }}
-                        >
-                          <PlusIcon className="w-4 h-4 lg:w-5 lg:h-5" />
-                        </button>
-                      </div>
 
-                      {/* Availability Badge */}
-                      <div className="absolute top-3 left-3">
-                        <div className="flex items-center space-x-1 bg-green-500/90 backdrop-blur-sm text-white px-2 py-1 rounded-full text-xs font-medium">
-                          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                          <span>Available</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Item Details */}
-                    <div className="p-4 lg:p-5 space-y-3">
-                      {/* Item Name & Category */}
-                      <div className="space-y-1">
-                        <h3 className="font-bold text-gray-900 text-sm lg:text-base line-clamp-1 group-hover:text-gray-800 transition-colors">
-                          {item.name}
-                        </h3>
-                        <div className="flex items-center space-x-2">
-                          <span 
-                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                            style={{ 
-                              backgroundColor: item.category.color + '15', 
-                              color: item.category.color 
-                            }}
-                          >
-                            <div 
-                              className="w-1.5 h-1.5 rounded-full mr-1"
-                              style={{ backgroundColor: item.category.color }}
-                            />
-                            {item.category.name}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Description */}
-                      {item.description && (
-                        <p className="text-xs lg:text-sm text-gray-600 line-clamp-2 leading-relaxed">
-                          {item.description}
-                        </p>
-                      )}
-
-                      {/* Price & Add Button */}
-                      <div className="flex items-center justify-between pt-2">
-                        <div className="space-y-0.5">
-                          <div className="text-xl lg:text-2xl font-bold text-gray-900">
-                            {formatPrice(item.price)}
+                        {/* Item Details */}
+                        <div className="p-3 lg:p-4">
+                          {/* Item Name & Category */}
+                          <div className="mb-2">
+                            <h3 className="font-bold text-gray-900 text-sm lg:text-base line-clamp-1 mb-1">
+                              {item.name}
+                            </h3>
+                            <span 
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                              style={{ 
+                                backgroundColor: item.category.color + '15', 
+                                color: item.category.color 
+                              }}
+                            >
+                              <div 
+                                className="w-1.5 h-1.5 rounded-full mr-1"
+                                style={{ backgroundColor: item.category.color }}
+                              />
+                              {item.category.name}
+                            </span>
                           </div>
-                          <div className="text-xs text-gray-500 font-medium">
-                            per item
+
+                          {/* Description */}
+                          {item.description && (
+                            <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed mb-3">
+                              {item.description}
+                            </p>
+                          )}
+
+                          {/* Price & Add Button */}
+                          <div className="flex items-end justify-between">
+                            <div>
+                              <div className="text-lg lg:text-xl font-bold text-gray-900">
+                                {formatPrice(item.price)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                per item
+                              </div>
+                            </div>
+                            
+                            <button 
+                              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white p-2.5 lg:p-3 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleAddToCart(item)
+                              }}
+                            >
+                              <PlusIcon className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Hover Effect */}
+                        <div className="absolute inset-0 rounded-2xl border-2 border-transparent group-hover:border-green-200 transition-all duration-300 pointer-events-none" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* List View */}
+                {viewType === 'list' && (
+                  <div className="space-y-1 pb-10">
+                    {filteredItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="group bg-white rounded-md shadow-sm hover:shadow-md transition-all duration-200 border-l-4 border-r border-t border-b border-gray-200 hover:border-gray-300 cursor-pointer"
+                        style={{ borderLeftColor: item.category.color }}
+                        onClick={() => handleAddToCart(item)}
+                      >
+                        <div className="flex items-center justify-between px-2 py-1.5 lg:px-3 lg:py-2">
+                          {/* Left Side - Item Info */}
+                          <div className="flex items-center space-x-2 lg:space-x-3 flex-1 min-w-0">
+                            {/* Item Details */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <h3 className="font-semibold text-gray-900 text-sm lg:text-base truncate">
+                                  {item.name}
+                                </h3>
+                                
+                                <span 
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0"
+                                  style={{ 
+                                    backgroundColor: item.category.color + '15', 
+                                    color: item.category.color 
+                                  }}
+                                >
+                                  <div 
+                                    className="w-1 h-1 rounded-full mr-1"
+                                    style={{ backgroundColor: item.category.color }}
+                                  />
+                                  {item.category.name}
+                                </span>
+                                
+                                <div className="flex items-center space-x-1 bg-green-500 text-white px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0">
+                                  <div className="w-1 h-1 bg-white rounded-full animate-pulse" />
+                                  <span className="hidden lg:inline">Available</span>
+                                  <span className="lg:hidden">✓</span>
+                                </div>
+                                
+                                {item.description && (
+                                  <p className="text-xs text-gray-600 truncate hidden xl:block">
+                                    {item.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Right Side - Price, Per Item, Add Button in One Line */}
+                          <div className="flex items-center space-x-2 lg:space-x-3 flex-shrink-0">
+                            <div className="text-base lg:text-lg font-bold text-gray-900">
+                              {formatPrice(item.price)}
+                            </div>
+                            <div className="text-xs text-gray-500 hidden lg:block">
+                              per item
+                            </div>
+                            <button 
+                              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white p-1.5 lg:p-2 rounded-lg font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleAddToCart(item)
+                              }}
+                            >
+                              <PlusIcon className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
                         
-                        <button 
-                          className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2.5 lg:px-5 lg:py-3 rounded-2xl font-semibold text-sm lg:text-base transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleAddToCart(item)
-                          }}
-                        >
-                          <div className="flex items-center space-x-1.5">
-                            <PlusIcon className="w-4 h-4" />
-                            <span>Add</span>
-                          </div>
-                        </button>
+                        {/* Hover Effect */}
+                        <div className="absolute inset-0 rounded-md border-2 border-transparent group-hover:border-green-200 transition-all duration-200 pointer-events-none" />
                       </div>
-                    </div>
-
-                    {/* Hover Effect Border */}
-                    <div className="absolute inset-0 rounded-3xl border-2 border-transparent group-hover:border-green-200 transition-all duration-300 pointer-events-none" />
-                    
-                    {/* Bottom Glow Effect */}
-                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-3/4 h-4 bg-green-400/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
         </div>
