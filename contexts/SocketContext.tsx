@@ -2,7 +2,6 @@
 
 import { disconnectSocket, initSocket } from '@/lib/socket'
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import toast from 'react-hot-toast'
 import { Socket } from 'socket.io-client'
 import { useAuth } from './AuthContext'
 
@@ -42,23 +41,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       newSocket.on('connect', () => {
         setIsConnected(true)
-        toast.success('Connected to live updates', { 
-          duration: 2000,
-          icon: '🔄',
-        })
+        
       })
       
       newSocket.on('disconnect', () => {
         setIsConnected(false)
-        toast.error('Disconnected from live updates', {
-          duration: 2000,
-          icon: '⚠️',
-        })
+       
       })
 
       newSocket.on('connect_error', () => {
         setIsConnected(false)
-        toast.error('Failed to connect to live updates')
+       
       })
     }
   }

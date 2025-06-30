@@ -2,18 +2,21 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import {
-    ArchiveBoxIcon,
-    ArrowRightOnRectangleIcon,
-    Bars3Icon,
-    BuildingStorefrontIcon,
-    ChartBarIcon,
-    ClipboardDocumentListIcon,
-    CogIcon,
-    ShoppingCartIcon,
-    TagIcon,
-    UserCircleIcon,
-    UserGroupIcon,
-    XMarkIcon
+  ArchiveBoxIcon,
+  ArrowRightOnRectangleIcon,
+  Bars3Icon,
+  BuildingStorefrontIcon,
+  ChartBarIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  ClipboardDocumentListIcon,
+  CogIcon,
+  ShoppingCartIcon,
+  Squares2X2Icon,
+  TagIcon,
+  UserCircleIcon,
+  UserGroupIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -24,6 +27,7 @@ export default function Navigation() {
   const router = useRouter()
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isMenusDropdownOpen, setIsMenusDropdownOpen] = useState(false)
 
   const handleLogout = async () => {
     await logout()
@@ -34,8 +38,15 @@ export default function Navigation() {
     { name: 'Dashboard', href: '/dashboard', icon: ChartBarIcon },
     { name: 'POS System', href: '/pos', icon: ShoppingCartIcon },
     { name: 'Orders', href: '/orders', icon: ClipboardDocumentListIcon },
-    { name: 'Categories', href: '/categories', icon: TagIcon },
-    { name: 'Menu Items', href: '/items', icon: ArchiveBoxIcon },
+    { 
+      name: 'Menus', 
+      icon: Squares2X2Icon,
+      isDropdown: true,
+      children: [
+        { name: 'Categories', href: '/categories', icon: TagIcon },
+        { name: 'Menu Items', href: '/items', icon: ArchiveBoxIcon },
+      ]
+    },
     { name: 'Users', href: '/users', icon: UserGroupIcon },
     { name: 'Settings', href: '/settings', icon: CogIcon },
   ]
@@ -60,7 +71,109 @@ export default function Navigation() {
     return false
   }
 
-  const filteredNavigation = navigation.filter(item => hasAccess(item.href))
+  // Check if user has access to any child items in dropdown
+  const hasDropdownAccess = (children: any[]) => {
+    return children.some(child => child.href && hasAccess(child.href))
+  }
+
+  const filteredNavigation = navigation.filter(item => {
+    if (item.isDropdown) {
+      return hasDropdownAccess(item.children)
+    }
+    return item.href && hasAccess(item.href)
+  })
+
+  // Check if any menu items are active
+  const isMenusActive = pathname === '/categories' || pathname === '/items'
+
+  const renderNavigationItem = (item: any, isMobile = false) => {
+    if (item.isDropdown) {
+      const Icon = item.icon
+      const isActive = isMenusActive
+      const isOpen = isMenusDropdownOpen
+      
+      return (
+        <div key={item.name}>
+          <button
+            onClick={() => setIsMenusDropdownOpen(!isMenusDropdownOpen)}
+            className={`
+              w-full group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors
+              ${isActive 
+                ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' 
+                : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+              }
+            `}
+          >
+            <div className="flex items-center">
+              <Icon 
+                className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'}`} 
+              />
+              {item.name}
+            </div>
+            {isOpen ? (
+              <ChevronDownIcon className="h-4 w-4 text-gray-400" />
+            ) : (
+              <ChevronRightIcon className="h-4 w-4 text-gray-400" />
+            )}
+          </button>
+          
+          {isOpen && (
+            <div className="ml-6 mt-1 space-y-1">
+              {item.children
+                .filter((child: any) => hasAccess(child.href))
+                .map((child: any) => {
+                  const isChildActive = pathname === child.href
+                  const ChildIcon = child.icon
+                  
+                  return (
+                    <Link
+                      key={child.name}
+                      href={child.href}
+                      onClick={() => isMobile && setIsMobileMenuOpen(false)}
+                      className={`
+                        group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors
+                        ${isChildActive 
+                          ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' 
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        }
+                      `}
+                    >
+                      <ChildIcon 
+                        className={`mr-3 h-4 w-4 ${isChildActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'}`} 
+                      />
+                      {child.name}
+                    </Link>
+                  )
+                })}
+            </div>
+          )}
+        </div>
+      )
+    } else {
+      const isActive = pathname === item.href
+      const Icon = item.icon
+      
+      return (
+        <Link
+          key={item.name}
+          href={item.href}
+          onClick={() => isMobile && setIsMobileMenuOpen(false)}
+          className={`
+            group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors
+            ${isActive 
+              ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' 
+              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+            }
+          `}
+        >
+          <Icon 
+            className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'}`} 
+          />
+          {item.name}
+        </Link>
+      )
+    }
+  }
 
   return (
     <>
@@ -89,29 +202,7 @@ export default function Navigation() {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1">
-            {filteredNavigation.map((item) => {
-              const isActive = pathname === item.href
-              const Icon = item.icon
-              
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`
-                    group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors
-                    ${isActive 
-                      ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' 
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                    }
-                  `}
-                >
-                  <Icon 
-                    className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'}`} 
-                  />
-                  {item.name}
-                </Link>
-              )
-            })}
+            {filteredNavigation.map((item) => renderNavigationItem(item, false))}
           </nav>
 
           {/* User Info */}
@@ -162,30 +253,7 @@ export default function Navigation() {
 
               {/* Navigation */}
               <nav className="flex-1 px-4 py-6 space-y-1">
-                {filteredNavigation.map((item) => {
-                  const isActive = pathname === item.href
-                  const Icon = item.icon
-                  
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={`
-                        group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors
-                        ${isActive 
-                          ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' 
-                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                        }
-                      `}
-                    >
-                      <Icon 
-                        className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'}`} 
-                      />
-                      {item.name}
-                    </Link>
-                  )
-                })}
+                {filteredNavigation.map((item) => renderNavigationItem(item, true))}
               </nav>
 
               {/* User Info */}
