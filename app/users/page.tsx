@@ -3,6 +3,7 @@
 import DashboardLayout from '@/components/ui/DashboardLayout'
 import DeleteConfirmModal from '@/components/ui/DeleteConfirmModal'
 import UserModal from '@/components/users/UserModal'
+import { useSystemPreferences } from '@/lib/useSystemPreferences'
 import { EyeIcon, EyeSlashIcon, MagnifyingGlassIcon, PencilIcon, PlusIcon, TrashIcon, UsersIcon } from '@heroicons/react/24/outline'
 import { useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
@@ -32,6 +33,8 @@ export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
+
+  const { requiresConfirmation, showSuccessNotification, showErrorNotification } = useSystemPreferences()
 
   useEffect(() => {
     fetchUsers()
@@ -95,26 +98,31 @@ export default function UsersPage() {
   }
 
   const handleDeleteUser = (user: User) => {
-    setDeletingUser(user)
+    if (requiresConfirmation()) {
+      setDeletingUser(user)
+    } else {
+      // Delete directly without confirmation
+      confirmDelete(user)
+    }
   }
 
-  const confirmDelete = async () => {
-    if (!deletingUser) return
+  const confirmDelete = async (userToDelete = deletingUser) => {
+    if (!userToDelete) return
 
     try {
-      const response = await fetch(`/api/users/${deletingUser.id}`, {
+      const response = await fetch(`/api/users/${userToDelete.id}`, {
         method: 'DELETE',
       })
 
       if (response.ok) {
-        setUsers(users.filter(u => u.id !== deletingUser.id))
-        toast.success('User deleted successfully')
+        setUsers(users.filter(u => u.id !== userToDelete.id))
+        showSuccessNotification('User deleted successfully')
       } else {
         const error = await response.json()
         throw new Error(error.error || 'Failed to delete user')
       }
     } catch (error: any) {
-      toast.error(error.message)
+      showErrorNotification(error.message)
     } finally {
       setDeletingUser(null)
     }
@@ -123,27 +131,23 @@ export default function UsersPage() {
   const handleSaveUser = async (userData: any) => {
     try {
       const url = editingUser ? `/api/users/${editingUser.id}` : '/api/users'
-      const method = editingUser ? 'PATCH' : 'POST'
+      const method = editingUser ? 'PUT' : 'POST'
 
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData),
       })
 
       if (response.ok) {
         const savedUser = await response.json()
-        
         if (editingUser) {
-          setUsers(users.map(u => u.id === savedUser.id ? savedUser : u))
-          toast.success('User updated successfully')
+          setUsers(users.map(u => u.id === editingUser.id ? savedUser : u))
+          showSuccessNotification('User updated successfully')
         } else {
-          setUsers([...users, savedUser])
-          toast.success('User created successfully')
+          setUsers([savedUser, ...users])
+          showSuccessNotification('User created successfully')
         }
-        
         setShowModal(false)
         setEditingUser(null)
       } else {
@@ -151,7 +155,7 @@ export default function UsersPage() {
         throw new Error(error.error || 'Failed to save user')
       }
     } catch (error: any) {
-      toast.error(error.message)
+      showErrorNotification(error.message)
     }
   }
 
@@ -539,10 +543,11 @@ export default function UsersPage() {
         />
       )}
 
-      {deletingUser && (
+      {/* Conditionally show delete confirmation modal */}
+      {deletingUser && requiresConfirmation() && (
         <DeleteConfirmModal
           title="Delete User"
-          message={`Are you sure you want to delete "${deletingUser.name}"? This action cannot be undone and will affect order history.`}
+          message={`Are you sure you want to delete "${deletingUser.name}"? This action cannot be undone.`}
           onConfirm={confirmDelete}
           onCancel={() => setDeletingUser(null)}
         />

@@ -3,6 +3,7 @@
 import ItemModal from '@/components/items/ItemModal'
 import DashboardLayout from '@/components/ui/DashboardLayout'
 import DeleteConfirmModal from '@/components/ui/DeleteConfirmModal'
+import { useSystemPreferences } from '@/lib/useSystemPreferences'
 import { formatPrice } from '@/lib/utils'
 import { ArrowDownIcon, ArrowUpIcon, FunnelIcon, PencilIcon, PhotoIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { useEffect, useState } from 'react'
@@ -53,6 +54,8 @@ export default function ItemsPage() {
   // Sorting
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
+
+  const { requiresConfirmation, showSuccessNotification, showErrorNotification } = useSystemPreferences()
 
   useEffect(() => {
     fetchData()
@@ -172,26 +175,31 @@ export default function ItemsPage() {
   }
 
   const handleDeleteItem = (item: Item) => {
-    setDeletingItem(item)
+    if (requiresConfirmation()) {
+      setDeletingItem(item)
+    } else {
+      // Delete directly without confirmation
+      confirmDelete(item)
+    }
   }
 
-  const confirmDelete = async () => {
-    if (!deletingItem) return
+  const confirmDelete = async (itemToDelete = deletingItem) => {
+    if (!itemToDelete) return
 
     try {
-      const response = await fetch(`/api/items/${deletingItem.id}`, {
+      const response = await fetch(`/api/items/${itemToDelete.id}`, {
         method: 'DELETE',
       })
 
       if (response.ok) {
-        setItems(items.filter(i => i.id !== deletingItem.id))
-        toast.success('Item deleted successfully')
+        setItems(items.filter(i => i.id !== itemToDelete.id))
+        showSuccessNotification('Item deleted successfully')
       } else {
         const error = await response.json()
         throw new Error(error.error || 'Failed to delete item')
       }
     } catch (error: any) {
-      toast.error(error.message)
+      showErrorNotification(error.message)
     } finally {
       setDeletingItem(null)
     }
@@ -200,27 +208,23 @@ export default function ItemsPage() {
   const handleSaveItem = async (itemData: any) => {
     try {
       const url = editingItem ? `/api/items/${editingItem.id}` : '/api/items'
-      const method = editingItem ? 'PATCH' : 'POST'
+      const method = editingItem ? 'PUT' : 'POST'
 
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(itemData),
       })
 
       if (response.ok) {
         const savedItem = await response.json()
-        
         if (editingItem) {
-          setItems(items.map(i => i.id === savedItem.id ? savedItem : i))
-          toast.success('Item updated successfully')
+          setItems(items.map(i => i.id === editingItem.id ? savedItem : i))
+          showSuccessNotification('Item updated successfully')
         } else {
-          setItems([...items, savedItem])
-          toast.success('Item created successfully')
+          setItems([savedItem, ...items])
+          showSuccessNotification('Item created successfully')
         }
-        
         setShowModal(false)
         setEditingItem(null)
       } else {
@@ -228,7 +232,7 @@ export default function ItemsPage() {
         throw new Error(error.error || 'Failed to save item')
       }
     } catch (error: any) {
-      toast.error(error.message)
+      showErrorNotification(error.message)
     }
   }
 
@@ -782,7 +786,8 @@ export default function ItemsPage() {
         />
       )}
 
-      {deletingItem && (
+      {/* Conditionally show delete confirmation modal */}
+      {deletingItem && requiresConfirmation() && (
         <DeleteConfirmModal
           title="Delete Item"
           message={`Are you sure you want to delete "${deletingItem.name}"? This action cannot be undone.`}

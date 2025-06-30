@@ -1,6 +1,7 @@
 'use client'
 
 import { useSettings } from '@/contexts/SettingsContext'
+import { useSystemPreferences } from '@/lib/useSystemPreferences'
 import { formatPrice } from '@/lib/utils'
 import { BanknotesIcon, ClockIcon, CreditCardIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useState } from 'react'
@@ -66,23 +67,28 @@ export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalP
   const [showInvoice, setShowInvoice] = useState(false)
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null)
   const { settings } = useSettings()
+  const { shouldAutoPrint, showErrorNotification, showLoadingNotification, showSuccessNotification } = useSystemPreferences()
 
   const handlePayment = async () => {
     setIsProcessing(true)
     
     try {
+      showLoadingNotification('Processing payment...', { id: 'payment' })
+      
       const order = await cart.processOrder(paymentType, notes || undefined)
       setCompletedOrder(order)
       
+      showSuccessNotification('Payment completed successfully!', { id: 'payment' })
+      
       // Check if auto-print is enabled in settings
-      if (settings?.printReceipts) {
+      if (shouldAutoPrint()) {
         setShowInvoice(true)
       } else {
         onSuccess()
       }
     } catch (error: any) {
       console.error('Payment failed:', error)
-      alert('Payment failed: ' + error.message)
+      showErrorNotification(error.message || 'Payment failed', { id: 'payment' })
     } finally {
       setIsProcessing(false)
     }
@@ -237,7 +243,7 @@ export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalP
           
           {/* Receipt Preview */}
           <p className="text-sm text-gray-600 text-center mt-4">
-            {settings?.printReceipts ? 
+            {shouldAutoPrint() ? 
               'Receipt will be printed automatically after payment' : 
               'Receipt will be available after payment completion'
             }
@@ -253,7 +259,7 @@ export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalP
             setShowInvoice(false)
             onSuccess()
           }}
-          autoPrint={settings?.printReceipts || false}
+          autoPrint={shouldAutoPrint()}
         />
       )}
     </div>

@@ -3,6 +3,7 @@
 import CategoryModal from '@/components/categories/CategoryModal'
 import DashboardLayout from '@/components/ui/DashboardLayout'
 import DeleteConfirmModal from '@/components/ui/DeleteConfirmModal'
+import { useSystemPreferences } from '@/lib/useSystemPreferences'
 import { PencilIcon, PlusIcon, TagIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
@@ -27,6 +28,7 @@ export default function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const { requiresConfirmation, showSuccessNotification, showErrorNotification } = useSystemPreferences()
 
   useEffect(() => {
     fetchCategories()
@@ -60,55 +62,56 @@ export default function CategoriesPage() {
   }
 
   const handleDeleteCategory = (category: Category) => {
-    setDeletingCategory(category)
+    if (requiresConfirmation()) {
+      setDeletingCategory(category)
+    } else {
+      // Delete directly without confirmation
+      confirmDelete(category)
+    }
   }
 
-  const confirmDelete = async () => {
-    if (!deletingCategory) return
+  const confirmDelete = async (categoryToDelete = deletingCategory) => {
+    if (!categoryToDelete) return
 
     try {
-      const response = await fetch(`/api/categories/${deletingCategory.id}`, {
+      const response = await fetch(`/api/categories/${categoryToDelete.id}`, {
         method: 'DELETE',
       })
 
       if (response.ok) {
-        setCategories(categories.filter(c => c.id !== deletingCategory.id))
-        toast.success('Category deleted successfully')
+        setCategories(categories.filter(c => c.id !== categoryToDelete.id))
+        showSuccessNotification('Category deleted successfully')
       } else {
         const error = await response.json()
         throw new Error(error.error || 'Failed to delete category')
       }
     } catch (error: any) {
-      toast.error(error.message)
+      showErrorNotification(error.message)
     } finally {
       setDeletingCategory(null)
     }
   }
 
-  const handleSaveCategory = async (categoryData: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleSaveCategory = async (categoryData: any) => {
     try {
       const url = editingCategory ? `/api/categories/${editingCategory.id}` : '/api/categories'
-      const method = editingCategory ? 'PATCH' : 'POST'
+      const method = editingCategory ? 'PUT' : 'POST'
 
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(categoryData),
       })
 
       if (response.ok) {
         const savedCategory = await response.json()
-        
         if (editingCategory) {
-          setCategories(categories.map(c => c.id === savedCategory.id ? savedCategory : c))
-          toast.success('Category updated successfully')
+          setCategories(categories.map(c => c.id === editingCategory.id ? savedCategory : c))
+          showSuccessNotification('Category updated successfully')
         } else {
-          setCategories([...categories, savedCategory])
-          toast.success('Category created successfully')
+          setCategories([savedCategory, ...categories])
+          showSuccessNotification('Category created successfully')
         }
-        
         setShowModal(false)
         setEditingCategory(null)
       } else {
@@ -116,7 +119,7 @@ export default function CategoriesPage() {
         throw new Error(error.error || 'Failed to save category')
       }
     } catch (error: any) {
-      toast.error(error.message)
+      showErrorNotification(error.message)
     }
   }
 
@@ -385,10 +388,11 @@ export default function CategoriesPage() {
         />
       )}
 
-      {deletingCategory && (
+      {/* Conditionally show delete confirmation modal */}
+      {deletingCategory && requiresConfirmation() && (
         <DeleteConfirmModal
           title="Delete Category"
-          message={`Are you sure you want to delete "${deletingCategory.name}"? This action cannot be undone.`}
+          message={`Are you sure you want to delete "${deletingCategory.name}"? This will also delete all items in this category.`}
           onConfirm={confirmDelete}
           onCancel={() => setDeletingCategory(null)}
         />

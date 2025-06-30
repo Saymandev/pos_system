@@ -2,12 +2,13 @@
 
 import PaymentModal from '@/components/pos/PaymentModal'
 import AuthGuard from '@/components/ui/AuthGuard'
+import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
+import { useSystemPreferences } from '@/lib/useSystemPreferences'
 import { formatPrice } from '@/lib/utils'
 import { ArrowLeftIcon, Bars3Icon, MagnifyingGlassIcon, MinusIcon, PlusIcon, ShoppingCartIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { toast } from 'react-hot-toast'
 
 interface Category {
   id: string
@@ -43,6 +44,8 @@ export default function POSPage() {
   
   const cart = useCart()
   const router = useRouter()
+  const { user } = useAuth()
+  const { showSuccessNotification, showErrorNotification } = useSystemPreferences()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -69,17 +72,17 @@ export default function POSPage() {
           setSelectedCategory(categoriesData[0].id)
         }
 
-        toast.success('Menu loaded successfully!')
+        showSuccessNotification('Menu loaded successfully!')
       } catch (error) {
         console.error('Failed to fetch data:', error)
-        toast.error('Failed to load menu data. Please refresh the page.')
+        showErrorNotification('Failed to load menu data. Please refresh the page.')
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchData()
-  }, [])
+  }, [showSuccessNotification, showErrorNotification])
 
   const handleAddToCart = (item: Item) => {
     cart.addItem({
@@ -91,7 +94,7 @@ export default function POSPage() {
         color: item.category.color
       }
     })
-    toast.success(`${item.name} added to cart`, {
+    showSuccessNotification(`${item.name} added to cart`, {
       duration: 2000,
       icon: '🛒',
     })
@@ -100,7 +103,7 @@ export default function POSPage() {
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity === 0) {
       cart.removeItem(itemId)
-      toast.success('Item removed from cart')
+      showSuccessNotification('Item removed from cart')
     } else {
       cart.updateQuantity(itemId, newQuantity)
     }
@@ -108,7 +111,7 @@ export default function POSPage() {
 
   const handleCheckout = () => {
     if (cart.items.length === 0) {
-      toast.error('Please add items to cart first', {
+      showErrorNotification('Please add items to cart first', {
         icon: '🛒',
       })
       return
@@ -462,7 +465,7 @@ export default function POSPage() {
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-500">Welcome back,</p>
-                <p className="font-semibold text-gray-900">Demo User</p>
+                <p className="font-semibold text-gray-900">{user?.name || 'User'}</p>
               </div>
             </div>
           </div>
@@ -719,7 +722,7 @@ export default function POSPage() {
                 <button
                   onClick={() => {
                     cart.clearCart()
-                    toast.success('Cart cleared')
+                    showSuccessNotification('Cart cleared')
                   }}
                   className="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-300 transition-all duration-200"
                 >
@@ -854,7 +857,7 @@ export default function POSPage() {
                     <button
                       onClick={() => {
                         cart.clearCart()
-                        toast.success('Cart cleared')
+                        showSuccessNotification('Cart cleared')
                         setShowCart(false)
                       }}
                       className="w-full bg-gray-200 text-gray-700 py-2 rounded-xl font-medium hover:bg-gray-300 transition-all duration-200"
@@ -881,7 +884,7 @@ export default function POSPage() {
             onSuccess={() => {
               cart.clearCart()
               setShowPayment(false)
-              toast.success('Order completed successfully!', {
+              showSuccessNotification('Order completed successfully!', {
                 duration: 4000,
                 icon: '🎉',
               })

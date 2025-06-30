@@ -1,15 +1,18 @@
 'use client'
 
 import DashboardLayout from '@/components/ui/DashboardLayout'
+import { useAuth } from '@/contexts/AuthContext'
 import { useSettings } from '@/contexts/SettingsContext'
 import { BellIcon, BuildingStorefrontIcon, CloudArrowDownIcon, Cog6ToothIcon, CurrencyDollarIcon, ShieldCheckIcon } from '@heroicons/react/24/outline'
 import { useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
 
 export default function SettingsPage() {
+  const { user } = useAuth()
   const { settings, isLoading: settingsLoading, updateSettings } = useSettings()
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [lastBackupDate, setLastBackupDate] = useState<Date | null>(null)
 
   // Local form state
   const [restaurantInfo, setRestaurantInfo] = useState({
@@ -88,6 +91,13 @@ export default function SettingsPage() {
     return () => clearTimeout(timer)
   }, [settingsLoading])
 
+  // Initialize last backup date from settings
+  useEffect(() => {
+    if (settings?.updatedAt) {
+      setLastBackupDate(new Date(settings.updatedAt))
+    }
+  }, [settings])
+
   const handleSaveSection = async (section: string, data: any) => {
     setIsSaving(true)
     try {
@@ -105,37 +115,49 @@ export default function SettingsPage() {
 
   const handleBackupData = async () => {
     try {
-      toast.loading('Generating backup...', { id: 'backup' })
+      // Check user permissions
+      if (user?.role !== 'ADMIN' && user?.role !== 'MANAGER') {
+        toast.error('Only Admin and Manager can download backups')
+        return
+      }
+
+      toast.loading('Generating comprehensive backup...', { id: 'backup' })
       
-      // Simulate backup generation
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      const response = await fetch('/api/backup')
       
-      // Create a backup file with current settings
-      const backupData = {
-        timestamp: new Date().toISOString(),
-        version: '1.0.0',
-        data: {
-          restaurantInfo,
-          taxSettings,
-          systemPrefs,
-          settings: settings,
-          note: 'Restaurant POS System backup file'
-        }
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to generate backup')
       }
       
+      const backupData = await response.json()
+      
+      // Create filename with timestamp and summary
+      const timestamp = new Date().toISOString().split('T')[0]
+      const summary = `${backupData.metadata.systemInfo.totalOrders}orders-${backupData.metadata.systemInfo.totalProducts}products`
+      const filename = `restaurant-backup-${timestamp}-${summary}.json`
+      
+      // Create and download the backup file
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `restaurant-backup-${new Date().toISOString().split('T')[0]}.json`
+      a.download = filename
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       
-      toast.success('Backup downloaded successfully!', { id: 'backup' })
+      // Update last backup date
+      setLastBackupDate(new Date())
+      
+      toast.success(
+        `Backup downloaded! ${backupData.metadata.systemInfo.totalOrders} orders, ${backupData.metadata.systemInfo.totalProducts} products included.`,
+        { id: 'backup', duration: 4000 }
+      )
     } catch (error) {
-      toast.error('Failed to generate backup', { id: 'backup' })
+      console.error('Backup error:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to generate backup', { id: 'backup' })
     }
   }
 
@@ -549,7 +571,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Backup & Security */}
+          {/* Enhanced Backup & Security */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center mb-6">
               <ShieldCheckIcon className="w-6 h-6 text-red-600 mr-3" />
@@ -557,12 +579,27 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-4">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              {/* Permission Check Warning */}
+              {user?.role !== 'ADMIN' && user?.role !== 'MANAGER' && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="text-red-600 mr-3">🚫</div>
+                    <div>
+                      <div className="font-medium text-red-800">Access Restricted</div>
+                      <div className="text-sm text-red-700">Only Admin and Manager can download backups</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-center">
-                  <div className="text-yellow-600 mr-3">⚠️</div>
+                  <div className="text-blue-600 mr-3">💾</div>
                   <div>
-                    <div className="font-medium text-yellow-800">Regular Backups Recommended</div>
-                    <div className="text-sm text-yellow-700">Backup your data regularly to prevent loss</div>
+                    <div className="font-medium text-blue-800">Comprehensive Backup</div>
+                    <div className="text-sm text-blue-700">
+                      Includes all orders, products, categories, users, and system settings
+                    </div>
                   </div>
                 </div>
               </div>
@@ -570,14 +607,15 @@ export default function SettingsPage() {
               <div className="space-y-3">
                 <button
                   onClick={handleBackupData}
-                  className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={user?.role !== 'ADMIN' && user?.role !== 'MANAGER'}
+                  className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                   <CloudArrowDownIcon className="w-5 h-5 mr-2" />
-                  Download Backup
+                  Download Complete Backup
                 </button>
 
                 <div className="text-sm text-gray-600 text-center">
-                  Last backup: {settings?.updatedAt ? new Date(settings.updatedAt).toLocaleDateString() : 'Never'}
+                  Last backup: {lastBackupDate ? lastBackupDate.toLocaleDateString() : 'Never'}
                 </div>
               </div>
 
@@ -585,38 +623,23 @@ export default function SettingsPage() {
                 <h3 className="font-medium text-gray-900 mb-3">Security Information</h3>
                 <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex justify-between">
-                    <span>Password Protection:</span>
-                    <span className="text-green-600 font-medium">✓ Enabled</span>
+                    <span>Role-based Access:</span>
+                    <span className="text-green-600 font-medium">✓ Active</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Data Encryption:</span>
-                    <span className="text-green-600 font-medium">✓ Active</span>
+                    <span className="text-green-600 font-medium">✓ Enabled</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Session Timeout:</span>
                     <span className="text-blue-600 font-medium">24 hours</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span>Current User Role:</span>
+                    <span className="text-purple-600 font-medium">{user?.role || 'Unknown'}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* System Information */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">System Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">v1.0.0</div>
-              <div className="text-sm text-gray-600">POS Version</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">98.5%</div>
-              <div className="text-sm text-gray-600">System Health</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">2.1 GB</div>
-              <div className="text-sm text-gray-600">Database Size</div>
             </div>
           </div>
         </div>
