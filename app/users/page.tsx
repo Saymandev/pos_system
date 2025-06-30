@@ -3,6 +3,7 @@
 import DashboardLayout from '@/components/ui/DashboardLayout'
 import DeleteConfirmModal from '@/components/ui/DeleteConfirmModal'
 import UserModal from '@/components/users/UserModal'
+import { useAuth } from '@/contexts/AuthContext'
 import { useSystemPreferences } from '@/lib/useSystemPreferences'
 import { EyeIcon, EyeSlashIcon, MagnifyingGlassIcon, PencilIcon, PlusIcon, TrashIcon, UsersIcon } from '@heroicons/react/24/outline'
 import { useEffect, useState } from 'react'
@@ -22,6 +23,7 @@ interface User {
 }
 
 export default function UsersPage() {
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -98,6 +100,18 @@ export default function UsersPage() {
   }
 
   const handleDeleteUser = (user: User) => {
+    // Prevent users from deleting themselves
+    if (currentUser?.id === user.id) {
+      showErrorNotification('You cannot delete your own account')
+      return
+    }
+
+    // Only admins can delete users
+    if (currentUser?.role !== 'ADMIN') {
+      showErrorNotification('Only administrators can delete users')
+      return
+    }
+
     if (requiresConfirmation()) {
       setDeletingUser(user)
     } else {
@@ -114,15 +128,18 @@ export default function UsersPage() {
         method: 'DELETE',
       })
 
+      const responseData = await response.json()
+
       if (response.ok) {
         setUsers(users.filter(u => u.id !== userToDelete.id))
         showSuccessNotification('User deleted successfully')
       } else {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to delete user')
+        console.error('Delete user error:', responseData)
+        throw new Error(responseData.error || 'Failed to delete user')
       }
     } catch (error: any) {
-      showErrorNotification(error.message)
+      console.error('Delete user error:', error)
+      showErrorNotification(error.message || 'Failed to delete user')
     } finally {
       setDeletingUser(null)
     }
@@ -131,7 +148,7 @@ export default function UsersPage() {
   const handleSaveUser = async (userData: any) => {
     try {
       const url = editingUser ? `/api/users/${editingUser.id}` : '/api/users'
-      const method = editingUser ? 'PUT' : 'POST'
+      const method = editingUser ? 'PATCH' : 'POST'
 
       const response = await fetch(url, {
         method,
@@ -501,8 +518,19 @@ export default function UsersPage() {
                       </button>
                       <button
                         onClick={() => handleDeleteUser(user)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete user"
+                        disabled={currentUser?.id === user.id || currentUser?.role !== 'ADMIN'}
+                        className={`p-2 rounded-lg transition-colors ${
+                          currentUser?.id === user.id || currentUser?.role !== 'ADMIN'
+                            ? 'text-gray-400 cursor-not-allowed'
+                            : 'text-red-600 hover:bg-red-50'
+                        }`}
+                        title={
+                          currentUser?.id === user.id
+                            ? 'Cannot delete your own account'
+                            : currentUser?.role !== 'ADMIN'
+                            ? 'Only administrators can delete users'
+                            : 'Delete user'
+                        }
                       >
                         <TrashIcon className="w-4 h-4" />
                       </button>
@@ -535,6 +563,7 @@ export default function UsersPage() {
       {showModal && (
         <UserModal
           user={editingUser}
+          currentUser={currentUser}
           onSave={handleSaveUser}
           onClose={() => {
             setShowModal(false)

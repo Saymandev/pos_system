@@ -8,18 +8,26 @@ interface User {
   email: string
   name: string
   role: 'ADMIN' | 'MANAGER' | 'STAFF'
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
+  isActive?: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
+interface AuthUser {
+  id: string
+  email: string
+  name: string
+  role: 'ADMIN' | 'MANAGER' | 'STAFF'
 }
 
 interface UserModalProps {
   user?: User | null
+  currentUser?: AuthUser | null
   onSave: (userData: any) => void
   onClose: () => void
 }
 
-export default function UserModal({ user, onSave, onClose }: UserModalProps) {
+export default function UserModal({ user, currentUser, onSave, onClose }: UserModalProps) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -41,7 +49,7 @@ export default function UserModal({ user, onSave, onClose }: UserModalProps) {
         password: '',
         confirmPassword: '',
         role: user.role,
-        isActive: user.isActive,
+        isActive: user.isActive ?? true,
       })
     }
   }, [user])
@@ -259,15 +267,22 @@ export default function UserModal({ user, onSave, onClose }: UserModalProps) {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Role & Permissions *
+              {currentUser?.id === user?.id && (
+                <span className="text-xs text-gray-500 ml-2">(You cannot change your own role)</span>
+              )}
             </label>
             <div className="space-y-3">
               {roles.map((role) => (
                 <label
                   key={role.value}
-                  className={`relative flex items-center p-4 border rounded-lg cursor-pointer transition-all hover:bg-gray-50 ${
+                  className={`relative flex items-center p-4 border rounded-lg transition-all hover:bg-gray-50 ${
                     formData.role === role.value
                       ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
                       : 'border-gray-200'
+                  } ${
+                    currentUser?.id === user?.id && currentUser?.role !== 'ADMIN'
+                      ? 'cursor-not-allowed opacity-50'
+                      : 'cursor-pointer'
                   }`}
                 >
                   <input
@@ -276,6 +291,7 @@ export default function UserModal({ user, onSave, onClose }: UserModalProps) {
                     value={role.value}
                     checked={formData.role === role.value}
                     onChange={(e) => handleChange('role', e.target.value)}
+                    disabled={currentUser?.id === user?.id && currentUser?.role !== 'ADMIN'}
                     className="sr-only"
                   />
                   <div className="flex items-center space-x-3 flex-1">
