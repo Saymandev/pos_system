@@ -20,6 +20,19 @@ async function main() {
     },
   })
 
+  // Create manager user
+  const managerPassword = await bcrypt.hash('manager123', 12)
+  const managerUser = await prisma.user.upsert({
+    where: { email: 'manager@restaurant.com' },
+    update: {},
+    create: {
+      email: 'manager@restaurant.com',
+      name: 'Manager User',
+      password: managerPassword,
+      role: 'MANAGER',
+    },
+  })
+
   // Create staff user
   const staffPassword = await bcrypt.hash('staff123', 12)
   const staffUser = await prisma.user.upsert({
@@ -101,6 +114,7 @@ async function main() {
 
   console.log('✅ Seed completed successfully!')
   console.log('👤 Admin login: admin@restaurant.com / admin123')
+  console.log('👤 Manager login: manager@restaurant.com / manager123')
   console.log('👤 Staff login: staff@restaurant.com / staff123')
 }
 

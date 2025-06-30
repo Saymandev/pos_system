@@ -44,6 +44,7 @@ export default function ItemsPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [deletingItem, setDeletingItem] = useState<Item | null>(null)
+  const [showDeleteOptions, setShowDeleteOptions] = useState<{item: Item, orderCount: number} | null>(null)
   
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('')
@@ -183,26 +184,57 @@ export default function ItemsPage() {
     }
   }
 
-  const confirmDelete = async (itemToDelete = deletingItem) => {
+  const confirmDelete = async (itemToDelete = deletingItem, force = false, deactivate = false) => {
     if (!itemToDelete) return
 
     try {
-      const response = await fetch(`/api/items/${itemToDelete.id}`, {
+      let url = `/api/items/${itemToDelete.id}`
+      if (force) url += '?force=true'
+      if (deactivate) url += '?deactivate=true'
+
+      const response = await fetch(url, {
         method: 'DELETE',
       })
 
+      const data = await response.json()
+
       if (response.ok) {
-        setItems(items.filter(i => i.id !== itemToDelete.id))
-        showSuccessNotification('Item deleted successfully')
+        if (data.action === 'deactivated') {
+          // Update item in state to show as inactive
+          setItems(items.map(i => i.id === itemToDelete.id ? { ...i, isAvailable: false } : i))
+          showSuccessNotification('Item deactivated successfully')
+        } else {
+          // Remove item from state
+          setItems(items.filter(i => i.id !== itemToDelete.id))
+          showSuccessNotification(data.message || 'Item deleted successfully')
+        }
       } else {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to delete item')
+        if (data.details && data.details.orderCount > 0) {
+          // Show options dialog for items that have been ordered
+          setShowDeleteOptions({
+            item: itemToDelete,
+            orderCount: data.details.orderCount
+          })
+          return
+        } else {
+          throw new Error(data.error || 'Failed to delete item')
+        }
       }
     } catch (error: any) {
       showErrorNotification(error.message)
     } finally {
       setDeletingItem(null)
     }
+  }
+
+  const handleForceDelete = async (item: Item) => {
+    setShowDeleteOptions(null)
+    await confirmDelete(item, true, false)
+  }
+
+  const handleDeactivateItem = async (item: Item) => {
+    setShowDeleteOptions(null)
+    await confirmDelete(item, false, true)
   }
 
   const handleSaveItem = async (itemData: any) => {
@@ -787,13 +819,63 @@ export default function ItemsPage() {
       )}
 
       {/* Conditionally show delete confirmation modal */}
-      {deletingItem && requiresConfirmation() && (
+      {deletingItem && requiresConfirmation() && !showDeleteOptions && (
         <DeleteConfirmModal
           title="Delete Item"
           message={`Are you sure you want to delete "${deletingItem.name}"? This action cannot be undone.`}
           onConfirm={confirmDelete}
           onCancel={() => setDeletingItem(null)}
         />
+      )}
+
+      {/* Delete options modal for items with orders */}
+      {showDeleteOptions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+                  <svg className="w-6 h-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Item Has Order History</h3>
+                </div>
+              </div>
+              
+              <p className="text-gray-600 mb-4">
+                "{showDeleteOptions.item.name}" has been ordered {showDeleteOptions.orderCount} time(s). 
+                Choose how to proceed:
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleDeactivateItem(showDeleteOptions.item)}
+                  className="w-full p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-left"
+                >
+                  <div className="font-medium text-blue-900">Deactivate Item (Recommended)</div>
+                  <div className="text-sm text-blue-700">Hide from POS but keep order history intact</div>
+                </button>
+
+                <button
+                  onClick={() => handleForceDelete(showDeleteOptions.item)}
+                  className="w-full p-3 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors text-left"
+                >
+                  <div className="font-medium text-red-900">Force Delete</div>
+                  <div className="text-sm text-red-700">Permanently delete (may affect order history)</div>
+                </button>
+
+                <button
+                  onClick={() => setShowDeleteOptions(null)}
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors text-center font-medium text-gray-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </DashboardLayout>
   )
