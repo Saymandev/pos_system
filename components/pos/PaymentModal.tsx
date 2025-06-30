@@ -88,12 +88,8 @@ export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalP
       
       showSuccessNotification('Payment completed successfully!', { id: 'payment' })
       
-      // Check if auto-print is enabled in settings
-      if (shouldAutoPrint()) {
-        setShowInvoice(true)
-      } else {
-        onSuccess()
-      }
+      // Always show invoice after payment, but never auto-print
+      setShowInvoice(true)
     } catch (error: any) {
       console.error('Payment failed:', error)
       showErrorNotification(error.message || 'Payment failed', { id: 'payment' })
@@ -374,10 +370,7 @@ export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalP
           
           {/* Receipt Preview */}
           <p className="text-sm text-gray-600 text-center mt-4">
-            {shouldAutoPrint() ? 
-              'Receipt will be printed automatically after payment' : 
-              'Receipt will be available after payment completion'
-            }
+            Receipt will be available after payment completion. Click Print Invoice to print.
           </p>
         </div>
       </div>
@@ -390,7 +383,7 @@ export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalP
             setShowInvoice(false)
             onSuccess()
           }}
-          autoPrint={shouldAutoPrint()}
+          autoPrint={false}
         />
       )}
     </div>
