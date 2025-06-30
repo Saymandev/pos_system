@@ -605,49 +605,125 @@ export default function POSPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 lg:gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3  lg:grid-cols-1 xl:grid-cols-3  gap-3 lg:gap-6 pb-10">
                 {filteredItems.map((item) => (
                   <div
                     key={item.id}
-                    className="group bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1 border border-gray-100"
+                    className="group bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-2 border border-gray-100 hover:border-gray-200 overflow-hidden relative"
                     onClick={() => handleAddToCart(item)}
                   >
+                    {/* Category Color Indicator */}
+                    <div 
+                      className="absolute top-0 left-0 right-0 h-1 z-10"
+                      style={{ backgroundColor: item.category.color }}
+                    />
+
                     {/* Item Image */}
-                    <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 rounded-t-2xl mb-2 lg:mb-4 flex items-center justify-center relative overflow-hidden">
+                    <div className="aspect-square bg-gradient-to-br from-gray-50 via-gray-100 to-gray-150 rounded-t-3xl relative overflow-hidden">
                       {item.image ? (
-                        <img 
-                          src={item.image} 
-                          alt={item.name}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                        />
+                        <>
+                          <img 
+                            src={item.image} 
+                            alt={item.name}
+                            className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
+                          />
+                          {/* Image Overlay Gradient */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        </>
                       ) : (
-                        <div className="text-gray-400 group-hover:text-gray-500 transition-colors">
-                          <svg className="w-8 h-8 lg:w-12 lg:h-12" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                          </svg>
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 via-gray-50 to-white">
+                          <div className="text-gray-300 group-hover:text-gray-400 transition-all duration-300 transform group-hover:scale-110">
+                            <svg className="w-12 h-12 lg:w-16 lg:h-16" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                            </svg>
+                          </div>
                         </div>
                       )}
-                      {/* Add button overlay */}
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
-                        <div className="bg-white rounded-full p-1.5 lg:p-2 opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-all duration-300 shadow-lg">
-                          <PlusIcon className="w-4 h-4 lg:w-5 lg:h-5 text-green-600" />
+                      
+                      {/* Floating Add Button */}
+                      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transform scale-50 group-hover:scale-100 transition-all duration-300">
+                        <button 
+                          className="bg-white/90 backdrop-blur-sm hover:bg-white text-green-600 p-2 lg:p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 border border-green-100 hover:border-green-200"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleAddToCart(item)
+                          }}
+                        >
+                          <PlusIcon className="w-4 h-4 lg:w-5 lg:h-5" />
+                        </button>
+                      </div>
+
+                      {/* Availability Badge */}
+                      <div className="absolute top-3 left-3">
+                        <div className="flex items-center space-x-1 bg-green-500/90 backdrop-blur-sm text-white px-2 py-1 rounded-full text-xs font-medium">
+                          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                          <span>Available</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Item Details */}
-                    <div className="p-3 lg:p-4">
-                      <h3 className="font-bold text-gray-900 mb-1 line-clamp-1 text-sm lg:text-base">{item.name}</h3>
+                    <div className="p-4 lg:p-5 space-y-3">
+                      {/* Item Name & Category */}
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-gray-900 text-sm lg:text-base line-clamp-1 group-hover:text-gray-800 transition-colors">
+                          {item.name}
+                        </h3>
+                        <div className="flex items-center space-x-2">
+                          <span 
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                            style={{ 
+                              backgroundColor: item.category.color + '15', 
+                              color: item.category.color 
+                            }}
+                          >
+                            <div 
+                              className="w-1.5 h-1.5 rounded-full mr-1"
+                              style={{ backgroundColor: item.category.color }}
+                            />
+                            {item.category.name}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Description */}
                       {item.description && (
-                        <p className="text-xs lg:text-sm text-gray-600 mb-2 lg:mb-3 line-clamp-2">{item.description}</p>
+                        <p className="text-xs lg:text-sm text-gray-600 line-clamp-2 leading-relaxed">
+                          {item.description}
+                        </p>
                       )}
-                      <div className="flex items-center justify-between">
-                        <span className="text-lg lg:text-xl font-bold text-green-600">{formatPrice(item.price)}</span>
-                        <button className="bg-green-500 hover:bg-green-600 text-white p-1.5 lg:p-2 rounded-lg transition-colors duration-200">
-                          <PlusIcon className="w-3 h-3 lg:w-4 lg:h-4" />
+
+                      {/* Price & Add Button */}
+                      <div className="flex items-center justify-between pt-2">
+                        <div className="space-y-0.5">
+                          <div className="text-xl lg:text-2xl font-bold text-gray-900">
+                            {formatPrice(item.price)}
+                          </div>
+                          <div className="text-xs text-gray-500 font-medium">
+                            per item
+                          </div>
+                        </div>
+                        
+                        <button 
+                          className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2.5 lg:px-5 lg:py-3 rounded-2xl font-semibold text-sm lg:text-base transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleAddToCart(item)
+                          }}
+                        >
+                          <div className="flex items-center space-x-1.5">
+                            <PlusIcon className="w-4 h-4" />
+                            <span>Add</span>
+                          </div>
                         </button>
                       </div>
                     </div>
+
+                    {/* Hover Effect Border */}
+                    <div className="absolute inset-0 rounded-3xl border-2 border-transparent group-hover:border-green-200 transition-all duration-300 pointer-events-none" />
+                    
+                    {/* Bottom Glow Effect */}
+                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-3/4 h-4 bg-green-400/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   </div>
                 ))}
               </div>
@@ -847,14 +923,20 @@ export default function POSPage() {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-1 bg-white rounded-lg border border-gray-200">
                                 <button
-                                  onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleQuantityChange(item.id, item.quantity - 1)
+                                  }}
                                   className="p-2 hover:bg-gray-100 rounded-l-lg transition-colors"
                                 >
                                   <MinusIcon className="w-4 h-4" />
                                 </button>
                                 <span className="px-3 py-2 font-semibold min-w-[3rem] text-center">{item.quantity}</span>
                                 <button
-                                  onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleQuantityChange(item.id, item.quantity + 1)
+                                  }}
                                   className="p-2 hover:bg-gray-100 rounded-r-lg transition-colors"
                                 >
                                   <PlusIcon className="w-4 h-4" />
