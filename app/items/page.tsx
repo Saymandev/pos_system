@@ -3,6 +3,7 @@
 import ItemModal from '@/components/items/ItemModal'
 import DashboardLayout from '@/components/ui/DashboardLayout'
 import DeleteConfirmModal from '@/components/ui/DeleteConfirmModal'
+import Pagination from '@/components/ui/Pagination'
 import { useSystemPreferences } from '@/lib/useSystemPreferences'
 import { formatPrice } from '@/lib/utils'
 import { ArrowDownIcon, ArrowUpIcon, FunnelIcon, PencilIcon, PhotoIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline'
@@ -46,6 +47,12 @@ export default function ItemsPage() {
   const [deletingItem, setDeletingItem] = useState<Item | null>(null)
   const [showDeleteOptions, setShowDeleteOptions] = useState<{item: Item, orderCount: number} | null>(null)
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(25)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
@@ -60,25 +67,44 @@ export default function ItemsPage() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [currentPage, itemsPerPage, searchTerm, selectedCategory, availabilityFilter, sortField, sortOrder])
 
   useEffect(() => {
-    applyFilters()
-  }, [items, searchTerm, selectedCategory, availabilityFilter, priceRange, sortField, sortOrder])
+    fetchCategories()
+  }, [])
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('/api/categories')
+      if (response.ok) {
+        const categoriesData = await response.json()
+        setCategories(categoriesData)
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    }
+  }
 
   const fetchData = async () => {
     try {
-      const [itemsResponse, categoriesResponse] = await Promise.all([
-        fetch('/api/items'),
-        fetch('/api/categories')
-      ])
+      setIsLoading(true)
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        sortBy: sortField,
+        sortOrder: sortOrder,
+      })
 
-      if (itemsResponse.ok && categoriesResponse.ok) {
-        const itemsData = await itemsResponse.json()
-        const categoriesData = await categoriesResponse.json()
-        
-        setItems(itemsData)
-        setCategories(categoriesData)
+      if (searchTerm) params.append('search', searchTerm)
+      if (selectedCategory) params.append('categoryId', selectedCategory)
+      if (availabilityFilter) params.append('isAvailable', availabilityFilter === 'available' ? 'true' : 'false')
+
+      const response = await fetch(`/api/items?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        setItems(data.items || [])
+        setTotalItems(data.pagination.total)
+        setTotalPages(data.pagination.pages)
       } else {
         throw new Error('Failed to fetch data')
       }
@@ -90,31 +116,19 @@ export default function ItemsPage() {
     }
   }
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage)
+    setCurrentPage(1) // Reset to first page
+  }
+
   const applyFilters = () => {
     let filtered = [...items]
 
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(item =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-
-    // Category filter
-    if (selectedCategory) {
-      filtered = filtered.filter(item => item.categoryId === selectedCategory)
-    }
-
-    // Availability filter
-    if (availabilityFilter) {
-      filtered = filtered.filter(item => 
-        availabilityFilter === 'available' ? item.isAvailable : !item.isAvailable
-      )
-    }
-
-    // Price range filter
+    // Price range filter (client-side for current page)
     if (priceRange.min || priceRange.max) {
       filtered = filtered.filter(item => {
         const min = priceRange.min ? parseFloat(priceRange.min) : 0
@@ -123,38 +137,12 @@ export default function ItemsPage() {
       })
     }
 
-    // Sorting
-    filtered.sort((a, b) => {
-      let valueA, valueB
-
-      switch (sortField) {
-        case 'name':
-          valueA = a.name.toLowerCase()
-          valueB = b.name.toLowerCase()
-          break
-        case 'price':
-          valueA = a.price
-          valueB = b.price
-          break
-        case 'category':
-          valueA = a.category.name.toLowerCase()
-          valueB = b.category.name.toLowerCase()
-          break
-        case 'createdAt':
-          valueA = new Date(a.createdAt).getTime()
-          valueB = new Date(b.createdAt).getTime()
-          break
-        default:
-          return 0
-      }
-
-      if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1
-      if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1
-      return 0
-    })
-
     setFilteredItems(filtered)
   }
+
+  useEffect(() => {
+    applyFilters()
+  }, [items, priceRange])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -295,6 +283,7 @@ export default function ItemsPage() {
     setSelectedCategory('')
     setAvailabilityFilter('')
     setPriceRange({ min: '', max: '' })
+    setCurrentPage(1)
   }
 
   if (isLoading) {
@@ -539,7 +528,7 @@ export default function ItemsPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           <div className="bg-white rounded-xl p-3 md:p-4 border border-gray-200 shadow-sm">
             <div className="text-center">
-              <div className="text-xl md:text-2xl font-bold text-blue-600">{items.length}</div>
+              <div className="text-xl md:text-2xl font-bold text-blue-600">{totalItems}</div>
               <div className="text-xs md:text-sm text-gray-600">Total Items</div>
             </div>
           </div>
@@ -800,6 +789,17 @@ export default function ItemsPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                onPageChange={handlePageChange}
+                onItemsPerPageChange={handleItemsPerPageChange}
+                itemsPerPageOptions={[10, 25, 50, 100]}
+              />
             </>
           )}
         </div>

@@ -1,5 +1,6 @@
 import { authenticateRequest } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { emitToPosUsers } from '@/lib/socketEmitter'
 import { generateOrderNumber } from '@/lib/utils'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -138,6 +139,9 @@ export async function POST(request: NextRequest) {
         },
       },
     })
+
+    // Emit real-time event for new order
+    emitToPosUsers('orderCreated', order)
 
     return NextResponse.json(order, { status: 201 })
   } catch (error) {

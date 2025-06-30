@@ -3,6 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
+import ConnectionStatus from './ConnectionStatus'
 import Navigation from './Navigation'
 
 interface DashboardLayoutProps {
@@ -28,9 +29,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex items-center space-x-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="text-gray-600 font-medium">Loading...</span>
+        <div className="flex items-center space-x-4">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+          <span className="text-gray-600 font-medium text-lg">Loading...</span>
         </div>
       </div>
     )
@@ -51,16 +52,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Only show navigation for authenticated users on non-public routes */}
-      {isAuthenticated && !isPublicRoute && <Navigation />}
-      <div className={`flex-1 flex flex-col overflow-hidden ${!isAuthenticated || isPublicRoute ? 'w-full' : 'lg:ml-64'}`}>
-        <main className="flex-1 overflow-y-auto">
-          <div className={`${isAuthenticated && !isPublicRoute ? 'p-4 sm:p-6 pt-16 lg:pt-6' : ''} min-h-full`}>
-            {children}
-          </div>
-        </main>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <Navigation />
+      <main className="lg:ml-64">
+        <div className="min-h-screen">
+          {children}
+        </div>
+      </main>
+      <ConnectionStatus />
     </div>
   )
 } 

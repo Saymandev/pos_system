@@ -2,6 +2,7 @@
 
 import AuthGuard from '@/components/ui/AuthGuard'
 import DashboardLayout from '@/components/ui/DashboardLayout'
+import { useSocket } from '@/contexts/SocketContext'
 import { formatDate, formatPrice } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { toast } from 'react-hot-toast'
@@ -28,6 +29,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { socket, isConnected } = useSocket()
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -66,6 +68,35 @@ export default function DashboardPage() {
 
     fetchDashboardData()
   }, [])
+
+  // Socket event listeners for real-time updates
+  useEffect(() => {
+    if (!socket) return
+
+    const handleOrderCreated = (newOrder: any) => {
+      setData(prevData => {
+        if (!prevData) return prevData
+        
+        return {
+          ...prevData,
+          totalOrders: prevData.totalOrders + 1,
+          totalSales: prevData.totalSales + newOrder.total,
+          recentOrders: [newOrder, ...prevData.recentOrders.slice(0, 4)] // Keep only 5 recent orders
+        }
+      })
+      
+      toast.success(`New order #${newOrder.orderNumber} received!`, {
+        icon: '🛎️',
+        duration: 4000,
+      })
+    }
+
+    socket.on('orderCreated', handleOrderCreated)
+
+    return () => {
+      socket.off('orderCreated', handleOrderCreated)
+    }
+  }, [socket])
 
   if (isLoading) {
     return (
@@ -197,61 +228,61 @@ export default function DashboardPage() {
   return (
     <AuthGuard>
       <DashboardLayout>
-      <div className="space-y-4 md:space-y-6">
-        <div className="px-4 sm:px-0">
+      <div className="space-y-6 md:space-y-8 p-4 md:p-6">
+        <div className="px-0">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">Overview of your restaurant's performance</p>
+          <p className="text-gray-600 mt-2">Overview of your restaurant's performance</p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 px-4 sm:px-0">
-          <div className="bg-white p-4 md:p-6 rounded-lg shadow">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+          <div className="bg-white p-6 md:p-8 rounded-lg shadow">
             <div className="flex items-center">
-              <div className="p-2 md:p-3 rounded-full bg-blue-100">
-                <svg className="h-5 w-5 md:h-6 md:w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="p-3 md:p-4 rounded-full bg-blue-100">
+                <svg className="h-6 w-6 md:h-7 md:w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <div className="ml-3 md:ml-4">
-                <p className="text-xs md:text-sm font-medium text-gray-600">Total Orders</p>
-                <p className="text-xl md:text-2xl font-bold text-gray-900">{data?.totalOrders || 0}</p>
+              <div className="ml-4 md:ml-5">
+                <p className="text-sm md:text-base font-medium text-gray-600">Total Orders</p>
+                <p className="text-2xl md:text-3xl font-bold text-gray-900">{data?.totalOrders || 0}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-4 md:p-6 rounded-lg shadow">
+          <div className="bg-white p-6 md:p-8 rounded-lg shadow">
             <div className="flex items-center">
-              <div className="p-2 md:p-3 rounded-full bg-green-100">
-                <svg className="h-5 w-5 md:h-6 md:w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="p-3 md:p-4 rounded-full bg-green-100">
+                <svg className="h-6 w-6 md:h-7 md:w-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                 </svg>
               </div>
-              <div className="ml-3 md:ml-4">
-                <p className="text-xs md:text-sm font-medium text-gray-600">Total Sales</p>
-                <p className="text-xl md:text-2xl font-bold text-gray-900">{formatPrice(data?.totalSales || 0)}</p>
+              <div className="ml-4 md:ml-5">
+                <p className="text-sm md:text-base font-medium text-gray-600">Total Sales</p>
+                <p className="text-2xl md:text-3xl font-bold text-gray-900">{formatPrice(data?.totalSales || 0)}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-4 md:p-6 rounded-lg shadow sm:col-span-2 lg:col-span-1">
+          <div className="bg-white p-6 md:p-8 rounded-lg shadow sm:col-span-2 lg:col-span-1">
             <div className="flex items-center">
-              <div className="p-2 md:p-3 rounded-full bg-purple-100">
-                <svg className="h-5 w-5 md:h-6 md:w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="p-3 md:p-4 rounded-full bg-purple-100">
+                <svg className="h-6 w-6 md:h-7 md:w-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               </div>
-              <div className="ml-3 md:ml-4">
-                <p className="text-xs md:text-sm font-medium text-gray-600">Total Items</p>
-                <p className="text-xl md:text-2xl font-bold text-gray-900">{data?.totalItems || 0}</p>
+              <div className="ml-4 md:ml-5">
+                <p className="text-sm md:text-base font-medium text-gray-600">Total Items</p>
+                <p className="text-2xl md:text-3xl font-bold text-gray-900">{data?.totalItems || 0}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Recent Orders */}
-        <div className="bg-white shadow rounded-lg mx-4 sm:mx-0">
-          <div className="px-4 md:px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Recent Orders</h3>
+        <div className="bg-white shadow rounded-lg">
+          <div className="px-6 md:px-8 py-5 md:py-6 border-b border-gray-200">
+            <h3 className="text-lg md:text-xl font-medium text-gray-900">Recent Orders</h3>
           </div>
           
           {data?.recentOrders && data.recentOrders.length > 0 ? (
@@ -259,22 +290,22 @@ export default function DashboardPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 md:px-8 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Order
                     </th>
-                    <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 md:px-8 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Staff
                     </th>
-                    <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 md:px-8 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Items
                     </th>
-                    <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 md:px-8 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Total
                     </th>
-                    <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 md:px-8 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
                     </th>
-                    <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 md:px-8 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                   </tr>
@@ -282,23 +313,23 @@ export default function DashboardPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {data.recentOrders.map((order) => (
                     <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <td className="px-6 md:px-8 py-5 whitespace-nowrap text-sm font-medium text-gray-900">
                         {order.orderNumber}
                       </td>
-                      <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 md:px-8 py-5 whitespace-nowrap text-sm text-gray-500">
                         {order.user.name}
                       </td>
-                      <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 md:px-8 py-5 whitespace-nowrap text-sm text-gray-500">
                         {order.orderItems.reduce((sum, item) => sum + item.quantity, 0)} items
                       </td>
-                      <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 md:px-8 py-5 whitespace-nowrap text-sm text-gray-900">
                         {formatPrice(order.total)}
                       </td>
-                      <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 md:px-8 py-5 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(new Date(order.createdAt))}
                       </td>
-                      <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      <td className="px-6 md:px-8 py-5 whitespace-nowrap">
+                        <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
                           order.status === 'COMPLETED' 
                             ? 'bg-green-100 text-green-800' 
                             : order.status === 'PENDING'
@@ -314,11 +345,11 @@ export default function DashboardPage() {
               </table>
             </div>
           ) : (
-            <div className="text-center py-12">
-              <svg className="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="text-center py-16">
+              <svg className="w-16 h-16 text-gray-300 mx-auto mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Orders Yet</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-3">No Orders Yet</h3>
               <p className="text-gray-500">Orders will appear here once they are placed</p>
             </div>
           )}

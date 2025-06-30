@@ -4,6 +4,7 @@ import PaymentModal from '@/components/pos/PaymentModal'
 import AuthGuard from '@/components/ui/AuthGuard'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
+import { useSocket } from '@/contexts/SocketContext'
 import { useSystemPreferences } from '@/lib/useSystemPreferences'
 import { formatPrice } from '@/lib/utils'
 import { ArrowLeftIcon, Bars3Icon, MagnifyingGlassIcon, MinusIcon, PlusIcon, ShoppingCartIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline'
@@ -45,6 +46,7 @@ export default function POSPage() {
   const cart = useCart()
   const router = useRouter()
   const { user } = useAuth()
+  const { socket, isConnected } = useSocket()
   const { showSuccessNotification, showErrorNotification } = useSystemPreferences()
 
   useEffect(() => {
@@ -52,7 +54,7 @@ export default function POSPage() {
       try {
         const [categoriesRes, itemsRes] = await Promise.all([
           fetch('/api/categories'),
-          fetch('/api/items')
+          fetch('/api/items/pos') // Dedicated POS endpoint - gets ALL items always
         ])
 
         if (!categoriesRes.ok || !itemsRes.ok) {
@@ -62,7 +64,7 @@ export default function POSPage() {
         const categoriesData = await categoriesRes.json()
         const itemsData = await itemsRes.json()
 
-        // Filter available items
+        // Filter available items for POS display
         const availableItems = itemsData.filter((item: Item) => item.isAvailable)
 
         setCategories(categoriesData)
@@ -83,6 +85,65 @@ export default function POSPage() {
 
     fetchData()
   }, [showSuccessNotification, showErrorNotification])
+
+  // Socket event listeners for real-time updates
+  useEffect(() => {
+    if (!socket) return
+
+    const handleItemUpdated = (updatedItem: Item) => {
+      setItems(prevItems => {
+        const existingIndex = prevItems.findIndex(item => item.id === updatedItem.id)
+        if (existingIndex !== -1) {
+          // Update existing item
+          const newItems = [...prevItems]
+          newItems[existingIndex] = updatedItem
+          return updatedItem.isAvailable ? newItems : newItems.filter(item => item.id !== updatedItem.id)
+        } else if (updatedItem.isAvailable) {
+          // Add new available item
+          return [...prevItems, updatedItem]
+        }
+        return prevItems
+      })
+      
+      if (updatedItem.isAvailable) {
+        showSuccessNotification(`${updatedItem.name} is now available!`, {
+          icon: '✅',
+          duration: 3000,
+        })
+      } else {
+        showErrorNotification(`${updatedItem.name} is no longer available`, {
+          icon: '❌',
+          duration: 3000,
+        })
+      }
+    }
+
+    const handleItemAvailabilityChanged = (data: { itemId: string, isAvailable: boolean, item: Item }) => {
+      const { itemId, isAvailable, item } = data
+      
+      setItems(prevItems => {
+        if (isAvailable) {
+          // Add item back to available items
+          const exists = prevItems.find(i => i.id === itemId)
+          if (!exists) {
+            return [...prevItems, item]
+          }
+          return prevItems.map(i => i.id === itemId ? { ...i, isAvailable: true } : i)
+        } else {
+          // Remove item from available items
+          return prevItems.filter(i => i.id !== itemId)
+        }
+      })
+    }
+
+    socket.on('itemUpdated', handleItemUpdated)
+    socket.on('itemAvailabilityChanged', handleItemAvailabilityChanged)
+
+    return () => {
+      socket.off('itemUpdated', handleItemUpdated)
+      socket.off('itemAvailabilityChanged', handleItemAvailabilityChanged)
+    }
+  }, [socket, showSuccessNotification, showErrorNotification])
 
   const handleAddToCart = (item: Item) => {
     cart.addItem({

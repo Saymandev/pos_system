@@ -2,6 +2,7 @@
 
 import InvoiceModal from '@/components/pos/InvoiceModal'
 import DashboardLayout from '@/components/ui/DashboardLayout'
+import Pagination from '@/components/ui/Pagination'
 import { formatPrice } from '@/lib/utils'
 import { ArrowDownIcon, ArrowUpIcon, ClipboardDocumentListIcon, EyeIcon, FunnelIcon, MagnifyingGlassIcon, PrinterIcon } from '@heroicons/react/24/outline'
 import { useEffect, useState } from 'react'
@@ -50,6 +51,12 @@ export default function OrdersPage() {
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(25)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
@@ -63,18 +70,27 @@ export default function OrdersPage() {
 
   useEffect(() => {
     fetchOrders()
-  }, [])
-
-  useEffect(() => {
-    applyFilters()
-  }, [orders, searchTerm, statusFilter, paymentFilter, dateRange, amountRange, sortField, sortOrder])
+  }, [currentPage, itemsPerPage, statusFilter, paymentFilter, dateRange])
 
   const fetchOrders = async () => {
     try {
-      const response = await fetch('/api/orders?limit=100')
+      setIsLoading(true)
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+      })
+
+      if (statusFilter) params.append('status', statusFilter)
+      if (paymentFilter) params.append('paymentType', paymentFilter)
+      if (dateRange.start) params.append('startDate', dateRange.start)
+      if (dateRange.end) params.append('endDate', dateRange.end)
+
+      const response = await fetch(`/api/orders?${params}`)
       if (response.ok) {
         const data = await response.json()
         setOrders(data.orders || [])
+        setTotalItems(data.pagination.total)
+        setTotalPages(data.pagination.pages)
       } else {
         throw new Error('Failed to fetch orders')
       }
@@ -86,10 +102,19 @@ export default function OrdersPage() {
     }
   }
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage)
+    setCurrentPage(1) // Reset to first page
+  }
+
   const applyFilters = () => {
     let filtered = [...orders]
 
-    // Search filter
+    // Search filter (client-side for current page)
     if (searchTerm) {
       filtered = filtered.filter(order =>
         order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -98,27 +123,7 @@ export default function OrdersPage() {
       )
     }
 
-    // Status filter
-    if (statusFilter) {
-      filtered = filtered.filter(order => order.status === statusFilter)
-    }
-
-    // Payment filter
-    if (paymentFilter) {
-      filtered = filtered.filter(order => order.paymentType === paymentFilter)
-    }
-
-    // Date range filter
-    if (dateRange.start || dateRange.end) {
-      filtered = filtered.filter(order => {
-        const orderDate = new Date(order.createdAt)
-        const startDate = dateRange.start ? new Date(dateRange.start) : new Date('1900-01-01')
-        const endDate = dateRange.end ? new Date(dateRange.end + 'T23:59:59') : new Date('2100-01-01')
-        return orderDate >= startDate && orderDate <= endDate
-      })
-    }
-
-    // Amount range filter
+    // Amount range filter (client-side for current page)
     if (amountRange.min || amountRange.max) {
       filtered = filtered.filter(order => {
         const min = amountRange.min ? parseFloat(amountRange.min) : 0
@@ -127,7 +132,7 @@ export default function OrdersPage() {
       })
     }
 
-    // Sorting
+    // Sorting (client-side for current page)
     filtered.sort((a, b) => {
       let valueA, valueB
 
@@ -160,6 +165,10 @@ export default function OrdersPage() {
     setFilteredOrders(filtered)
   }
 
+  useEffect(() => {
+    applyFilters()
+  }, [orders, searchTerm, amountRange, sortField, sortOrder])
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
@@ -175,6 +184,7 @@ export default function OrdersPage() {
     setPaymentFilter('')
     setDateRange({ start: '', end: '' })
     setAmountRange({ min: '', max: '' })
+    setCurrentPage(1)
   }
 
   const getStatusColor = (status: string) => {
@@ -328,7 +338,7 @@ export default function OrdersPage() {
               <p className="text-gray-600 mt-2">Track and manage all orders</p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-blue-600">{orders.length}</div>
+              <div className="text-2xl font-bold text-blue-600">{totalItems}</div>
               <div className="text-sm text-gray-600">Total Orders</div>
             </div>
           </div>
@@ -496,130 +506,143 @@ export default function OrdersPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('orderNumber')}
-                    >
-                      <div className="flex items-center space-x-1">
-                        <span>Order #</span>
-                        {sortField === 'orderNumber' && (
-                          sortOrder === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> : <ArrowDownIcon className="w-4 h-4" />
-                        )}
-                      </div>
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('createdAt')}
-                    >
-                      <div className="flex items-center space-x-1">
-                        <span>Date & Time</span>
-                        {sortField === 'createdAt' && (
-                          sortOrder === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> : <ArrowDownIcon className="w-4 h-4" />
-                        )}
-                      </div>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Staff
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Items
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('status')}
-                    >
-                      <div className="flex items-center space-x-1">
-                        <span>Status</span>
-                        {sortField === 'status' && (
-                          sortOrder === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> : <ArrowDownIcon className="w-4 h-4" />
-                        )}
-                      </div>
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Payment
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('total')}
-                    >
-                      <div className="flex items-center space-x-1">
-                        <span>Total</span>
-                        {sortField === 'total' && (
-                          sortOrder === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> : <ArrowDownIcon className="w-4 h-4" />
-                        )}
-                      </div>
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-blue-600">#{order.orderNumber}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {new Date(order.createdAt).toLocaleDateString()}
+            <>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('orderNumber')}
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>Order #</span>
+                          {sortField === 'orderNumber' && (
+                            sortOrder === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> : <ArrowDownIcon className="w-4 h-4" />
+                          )}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {new Date(order.createdAt).toLocaleTimeString()}
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('createdAt')}
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>Date & Time</span>
+                          {sortField === 'createdAt' && (
+                            sortOrder === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> : <ArrowDownIcon className="w-4 h-4" />
+                          )}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{order.user.name}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {order.orderItems.length} {order.orderItems.length === 1 ? 'item' : 'items'}
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Staff
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Items
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('status')}
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>Status</span>
+                          {sortField === 'status' && (
+                            sortOrder === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> : <ArrowDownIcon className="w-4 h-4" />
+                          )}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {order.orderItems.reduce((sum, item) => sum + item.quantity, 0)} total qty
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Payment
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleSort('total')}
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>Total</span>
+                          {sortField === 'total' && (
+                            sortOrder === 'asc' ? <ArrowUpIcon className="w-4 h-4" /> : <ArrowDownIcon className="w-4 h-4" />
+                          )}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center text-sm text-gray-900">
-                          <span className="mr-2">{getPaymentIcon(order.paymentType)}</span>
-                          {order.paymentType}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatPrice(order.total)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => viewOrderDetails(order)}
-                            className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
-                            title="View details"
-                          >
-                            <EyeIcon className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => printInvoice(order)}
-                            className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
-                            title="Print invoice"
-                          >
-                            <PrinterIcon className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredOrders.map((order) => (
+                      <tr key={order.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-blue-600">#{order.orderNumber}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {new Date(order.createdAt).toLocaleDateString()}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {new Date(order.createdAt).toLocaleTimeString()}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{order.user.name}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {order.orderItems.length} {order.orderItems.length === 1 ? 'item' : 'items'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {order.orderItems.reduce((sum, item) => sum + item.quantity, 0)} total qty
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center text-sm text-gray-900">
+                            <span className="mr-2">{getPaymentIcon(order.paymentType)}</span>
+                            {order.paymentType}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {formatPrice(order.total)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => viewOrderDetails(order)}
+                              className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+                              title="View details"
+                            >
+                              <EyeIcon className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => printInvoice(order)}
+                              className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
+                              title="Print invoice"
+                            >
+                              <PrinterIcon className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Pagination */}
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                onPageChange={handlePageChange}
+                onItemsPerPageChange={handleItemsPerPageChange}
+                itemsPerPageOptions={[10, 25, 50, 100]}
+              />
+            </>
           )}
         </div>
       </div>

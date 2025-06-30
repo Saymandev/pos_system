@@ -2,6 +2,7 @@
 
 import DashboardLayout from '@/components/ui/DashboardLayout'
 import DeleteConfirmModal from '@/components/ui/DeleteConfirmModal'
+import Pagination from '@/components/ui/Pagination'
 import UserModal from '@/components/users/UserModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSystemPreferences } from '@/lib/useSystemPreferences'
@@ -31,6 +32,12 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [deletingUser, setDeletingUser] = useState<User | null>(null)
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(25)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('')
@@ -40,18 +47,26 @@ export default function UsersPage() {
 
   useEffect(() => {
     fetchUsers()
-  }, [])
-
-  useEffect(() => {
-    applyFilters()
-  }, [users, searchTerm, roleFilter, statusFilter])
+  }, [currentPage, itemsPerPage, searchTerm, roleFilter, statusFilter])
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/users')
+      setIsLoading(true)
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+      })
+
+      if (searchTerm) params.append('search', searchTerm)
+      if (roleFilter) params.append('role', roleFilter)
+      if (statusFilter) params.append('isActive', statusFilter === 'active' ? 'true' : 'false')
+
+      const response = await fetch(`/api/users?${params}`)
       if (response.ok) {
         const data = await response.json()
-        setUsers(data)
+        setUsers(data.users || [])
+        setTotalItems(data.pagination.total)
+        setTotalPages(data.pagination.pages)
       } else {
         throw new Error('Failed to fetch users')
       }
@@ -63,31 +78,23 @@ export default function UsersPage() {
     }
   }
 
-  const applyFilters = () => {
-    let filtered = [...users]
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(user =>
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-
-    // Role filter
-    if (roleFilter) {
-      filtered = filtered.filter(user => user.role === roleFilter)
-    }
-
-    // Status filter
-    if (statusFilter) {
-      filtered = filtered.filter(user => 
-        statusFilter === 'active' ? user.isActive : !user.isActive
-      )
-    }
-
-    setFilteredUsers(filtered)
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
   }
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage)
+    setCurrentPage(1) // Reset to first page
+  }
+
+  const applyFilters = () => {
+    // Since we're doing server-side filtering now, this just sets the filtered users
+    setFilteredUsers(users)
+  }
+
+  useEffect(() => {
+    applyFilters()
+  }, [users])
 
   const handleAddUser = () => {
     setEditingUser(null)
@@ -202,6 +209,7 @@ export default function UsersPage() {
     setSearchTerm('')
     setRoleFilter('')
     setStatusFilter('')
+    setCurrentPage(1)
   }
 
   const getRoleColor = (role: string) => {
@@ -402,11 +410,11 @@ export default function UsersPage() {
           </div>
         </div>
 
-        {/* Statistics Cards */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{users.length}</div>
+              <div className="text-2xl font-bold text-blue-600">{totalItems}</div>
               <div className="text-sm text-gray-600">Total Users</div>
             </div>
           </div>
@@ -420,24 +428,134 @@ export default function UsersPage() {
           </div>
           <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
             <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">
+              <div className="text-2xl font-bold text-yellow-600">
                 {users.filter(u => u.role === 'ADMIN').length}
               </div>
-              <div className="text-sm text-gray-600">Administrators</div>
+              <div className="text-sm text-gray-600">Admins</div>
             </div>
           </div>
           <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">{filteredUsers.length}</div>
-              <div className="text-sm text-gray-600">Filtered Results</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {users.filter(u => u.role === 'STAFF').length}
+              </div>
+              <div className="text-sm text-gray-600">Staff</div>
             </div>
           </div>
         </div>
 
-        {/* Users Grid */}
+        {/* Users List */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {filteredUsers.length === 0 ? (
-            <div className="text-center py-20">
+          {filteredUsers.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+                {filteredUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="group bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
+                  >
+                    {/* User Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                            {user.name}
+                          </h3>
+                          <p className="text-sm text-gray-600">{user.email}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
+                              <span className="mr-1">{getRoleIcon(user.role)}</span>
+                              {user.role}
+                            </span>
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                user.isActive
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}
+                            >
+                              {user.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => handleEditUser(user)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit user"
+                        >
+                          <PencilIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => toggleUserStatus(user)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            user.isActive
+                              ? 'text-red-600 hover:bg-red-50'
+                              : 'text-green-600 hover:bg-green-50'
+                          }`}
+                          title={user.isActive ? 'Deactivate user' : 'Activate user'}
+                        >
+                          {user.isActive ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user)}
+                          disabled={currentUser?.id === user.id || currentUser?.role !== 'ADMIN'}
+                          className={`p-2 rounded-lg transition-colors ${
+                            currentUser?.id === user.id || currentUser?.role !== 'ADMIN'
+                              ? 'text-gray-400 cursor-not-allowed'
+                              : 'text-red-600 hover:bg-red-50'
+                          }`}
+                          title={
+                            currentUser?.id === user.id
+                              ? 'Cannot delete your own account'
+                              : currentUser?.role !== 'ADMIN'
+                              ? 'Only administrators can delete users'
+                              : 'Delete user'
+                          }
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* User Stats */}
+                    <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-blue-600">
+                          {user._count?.orders || 0}
+                        </div>
+                        <div className="text-xs text-gray-600">Orders Processed</div>
+                      </div>
+                    </div>
+
+                    {/* User Footer */}
+                    <div className="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-gray-100">
+                      <span>Joined: {new Date(user.createdAt).toLocaleDateString()}</span>
+                      <span>Updated: {new Date(user.updatedAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Pagination */}
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                onPageChange={handlePageChange}
+                onItemsPerPageChange={handleItemsPerPageChange}
+                itemsPerPageOptions={[10, 25, 50]}
+              />
+            </>
+          ) : (
+            <div className="text-center py-16">
               <UsersIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 {searchTerm || roleFilter || statusFilter
@@ -459,101 +577,6 @@ export default function UsersPage() {
                   Add First User
                 </button>
               )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-              {filteredUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className="group bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
-                >
-                  {/* User Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                        {user.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                          {user.name}
-                        </h3>
-                        <p className="text-sm text-gray-600">{user.email}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
-                            <span className="mr-1">{getRoleIcon(user.role)}</span>
-                            {user.role}
-                          </span>
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              user.isActive
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}
-                          >
-                            {user.isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => handleEditUser(user)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Edit user"
-                      >
-                        <PencilIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => toggleUserStatus(user)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          user.isActive
-                            ? 'text-red-600 hover:bg-red-50'
-                            : 'text-green-600 hover:bg-green-50'
-                        }`}
-                        title={user.isActive ? 'Deactivate user' : 'Activate user'}
-                      >
-                        {user.isActive ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user)}
-                        disabled={currentUser?.id === user.id || currentUser?.role !== 'ADMIN'}
-                        className={`p-2 rounded-lg transition-colors ${
-                          currentUser?.id === user.id || currentUser?.role !== 'ADMIN'
-                            ? 'text-gray-400 cursor-not-allowed'
-                            : 'text-red-600 hover:bg-red-50'
-                        }`}
-                        title={
-                          currentUser?.id === user.id
-                            ? 'Cannot delete your own account'
-                            : currentUser?.role !== 'ADMIN'
-                            ? 'Only administrators can delete users'
-                            : 'Delete user'
-                        }
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* User Stats */}
-                  <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-blue-600">
-                        {user._count?.orders || 0}
-                      </div>
-                      <div className="text-xs text-gray-600">Orders Processed</div>
-                    </div>
-                  </div>
-
-                  {/* User Footer */}
-                  <div className="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-gray-100">
-                    <span>Joined: {new Date(user.createdAt).toLocaleDateString()}</span>
-                    <span>Updated: {new Date(user.updatedAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              ))}
             </div>
           )}
         </div>

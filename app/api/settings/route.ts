@@ -1,5 +1,6 @@
 import { authenticateRequest } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { emitToPosUsers } from '@/lib/socketEmitter'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
@@ -47,6 +48,9 @@ export async function POST(request: NextRequest) {
         data: data
       })
     }
+
+    // Emit real-time event for settings update
+    emitToPosUsers('settingsUpdated', settings)
 
     return NextResponse.json(settings)
   } catch (error) {

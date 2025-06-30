@@ -1,6 +1,7 @@
 import { AuthProvider } from '@/contexts/AuthContext'
 import { CartProvider } from '@/contexts/CartContext'
 import { SettingsProvider } from '@/contexts/SettingsContext'
+import { SocketProvider } from '@/contexts/SocketContext'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
@@ -23,10 +24,12 @@ export default function RootLayout({
       <body className={`${inter.className} hide-scrollbar`}>
         <AuthProvider>
           <SettingsProvider>
-            <CartProvider>
-              {children}
-              <Toaster position="top-right" />
-            </CartProvider>
+            <SocketProvider>
+              <CartProvider>
+                {children}
+                <Toaster position="top-right" />
+              </CartProvider>
+            </SocketProvider>
           </SettingsProvider>
         </AuthProvider>
       </body>
