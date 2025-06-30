@@ -144,55 +144,81 @@ const PrintableInvoice = ({ order, settings }: { order: Order, settings: any }) 
 export default function InvoiceModal({ order, onClose, autoPrint = false }: InvoiceModalProps) {
   const { settings } = useSettings()
   const printRef = useRef<HTMLDivElement>(null)
+  const isPrintingRef = useRef(false)
+  const hasAutoPrintedRef = useRef(false)
 
   const handlePrint = () => {
-    if (printRef.current) {
-      // Add print styles temporarily to head
-      const printStyles = document.createElement('style')
-      printStyles.id = 'temp-print-styles'
-      printStyles.innerHTML = `
-        @media print {
-          body * { visibility: hidden; }
-          #print-content, #print-content * { visibility: visible; }
-          #print-content { 
-            position: absolute; 
-            left: 0; 
-            top: 0; 
-            width: 100%;
-            margin: 0; 
-            padding: 20px; 
-            font-family: 'Courier New', monospace; 
-          }
+    // Prevent multiple simultaneous prints
+    if (isPrintingRef.current || !printRef.current) {
+      return
+    }
+    
+    isPrintingRef.current = true
+    
+    // Clean up any existing print styles first
+    const existingStyles = document.getElementById('temp-print-styles')
+    if (existingStyles) {
+      document.head.removeChild(existingStyles)
+    }
+    
+    // Add print styles temporarily to head
+    const printStyles = document.createElement('style')
+    printStyles.id = 'temp-print-styles'
+    printStyles.innerHTML = `
+      @media print {
+        body * { visibility: hidden; }
+        #print-content, #print-content * { visibility: visible; }
+        #print-content { 
+          position: absolute; 
+          left: 0; 
+          top: 0; 
+          width: 100%;
+          margin: 0; 
+          padding: 20px; 
+          font-family: 'Courier New', monospace; 
         }
-      `
-      document.head.appendChild(printStyles)
-      
-      // Add temp ID to print content
-      const originalId = printRef.current.id
-      printRef.current.id = 'print-content'
-      
-      // Print
-      window.print()
-      
-      // Clean up
-      document.head.removeChild(printStyles)
-      printRef.current.id = originalId
+      }
+    `
+    document.head.appendChild(printStyles)
+    
+    // Add temp ID to print content
+    const originalId = printRef.current.id
+    printRef.current.id = 'print-content'
+    
+    // Print with cleanup
+    window.print()
+    
+    // Clean up after a delay to ensure print dialog has processed
+    setTimeout(() => {
+      try {
+        const stylesToRemove = document.getElementById('temp-print-styles')
+        if (stylesToRemove) {
+          document.head.removeChild(stylesToRemove)
+        }
+        if (printRef.current) {
+          printRef.current.id = originalId
+        }
+      } catch (error) {
+        console.warn('Error cleaning up print styles:', error)
+      }
+      isPrintingRef.current = false
       
       if (autoPrint) {
         onClose()
       }
-    }
+    }, 1000)
   }
 
   // Auto print when modal opens if autoPrint is true
   useEffect(() => {
-    if (autoPrint && settings) {
+    if (autoPrint && settings && !hasAutoPrintedRef.current) {
+      hasAutoPrintedRef.current = true
       const timer = setTimeout(() => {
         handlePrint()
       }, 500) // Small delay to ensure content is rendered
       return () => clearTimeout(timer)
     }
-  }, [autoPrint, settings])
+  }, [autoPrint, settings]) // Keep settings but use hasAutoPrintedRef to prevent multiple triggers
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

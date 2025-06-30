@@ -7,7 +7,7 @@ export default function ConnectionStatus() {
   const { isConnected } = useSocket()
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed top-6 right-6 z-50">
       <div className={`
         flex items-center space-x-3 px-4 py-3 rounded-full text-sm font-medium shadow-lg border transition-all duration-200
         ${isConnected 
