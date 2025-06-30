@@ -4,6 +4,7 @@ import PaymentModal from '@/components/pos/PaymentModal'
 import AuthGuard from '@/components/ui/AuthGuard'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
+import { useSettings } from '@/contexts/SettingsContext'
 import { useSocket } from '@/contexts/SocketContext'
 import { useSystemPreferences } from '@/lib/useSystemPreferences'
 import { formatPrice } from '@/lib/utils'
@@ -48,6 +49,7 @@ export default function POSPage() {
   const { user } = useAuth()
   const { socket, isConnected } = useSocket()
   const { showSuccessNotification, showErrorNotification } = useSystemPreferences()
+  const { settings } = useSettings()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -778,7 +780,7 @@ export default function POSPage() {
                           <p className="text-sm text-gray-600 mb-2">{formatPrice(item.price)} each</p>
                           
                           {/* Quantity Controls */}
-                          <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-3 mb-2">
                             <div className="flex items-center space-x-1 bg-white rounded-lg border border-gray-200">
                               <button
                                 onClick={(e) => {
@@ -801,9 +803,39 @@ export default function POSPage() {
                               </button>
                             </div>
                             
-                            <span className="font-bold text-green-600">
-                              {formatPrice(item.price * item.quantity)}
-                            </span>
+                            <div className="text-right">
+                              {item.discount > 0 ? (
+                                <div className="space-y-1">
+                                  <span className="text-gray-400 line-through text-xs">{formatPrice(item.price * item.quantity)}</span>
+                                  <span className="font-bold text-green-600 text-sm">{formatPrice(cart.getItemSubtotal(item))}</span>
+                                </div>
+                              ) : (
+                                <span className="font-bold text-green-600">{formatPrice(item.price * item.quantity)}</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Discount Control */}
+                          <div className="flex items-center space-x-2">
+                            <label className="text-xs text-gray-600">Discount:</label>
+                            <div className="flex items-center space-x-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={item.discount || ''}
+                                onChange={(e) => cart.updateItemDiscount(item.id, parseFloat(e.target.value) || 0)}
+                                className="w-14 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-transparent"
+                                placeholder="0"
+                              />
+                              <span className="text-xs text-gray-500">%</span>
+                              {item.discount > 0 && (
+                                <span className="text-xs text-green-600 font-medium">
+                                  (-{formatPrice(cart.getItemDiscountAmount(item))})
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         
@@ -836,14 +868,80 @@ export default function POSPage() {
                   <span className="text-gray-600">Subtotal:</span>
                   <span className="font-medium">{formatPrice(cart.subtotal)}</span>
                 </div>
+                {(cart.orderDiscountAmount > 0 || cart.items.some(item => item.discount > 0)) && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Discounts:</span>
+                    <span>-{formatPrice(cart.items.reduce((sum, item) => sum + cart.getItemDiscountAmount(item), 0) + cart.orderDiscountAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tax (8.875%):</span>
+                  <span className="text-gray-600">Tax ({settings?.taxRate || 0}%):</span>
                   <span className="font-medium">{formatPrice(cart.tax)}</span>
                 </div>
                 <div className="border-t border-gray-300 pt-3">
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total:</span>
                     <span className="text-green-600">{formatPrice(cart.total)}</span>
+                  </div>
+                </div>
+                
+                {/* Quick Order Discount Buttons */}
+                <div className="pt-2 border-t border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-gray-600">Quick Discount:</span>
+                    {cart.orderDiscount > 0 && (
+                      <span className="text-xs text-green-600 font-medium">
+                        {cart.orderDiscount}% Applied
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {[5, 10, 15, 20].map((percentage) => (
+                      <button
+                        key={percentage}
+                        onClick={() => cart.updateOrderDiscount(percentage)}
+                        className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                          cart.orderDiscount === percentage
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {percentage}%
+                      </button>
+                    ))}
+                    {cart.orderDiscount > 0 && (
+                      <button
+                        onClick={() => cart.updateOrderDiscount(0)}
+                        className="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Custom Discount Input */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-xs text-gray-600 font-medium">Custom:</label>
+                    <div className="flex items-center space-x-1 flex-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={cart.orderDiscount || ''}
+                        onChange={(e) => cart.updateOrderDiscount(parseFloat(e.target.value) || 0)}
+                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Enter % discount"
+                      />
+                      <span className="text-xs text-gray-500">%</span>
+                      <button
+                        onClick={() => cart.updateOrderDiscount(0)}
+                        className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors"
+                        title="Clear discount"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -920,7 +1018,7 @@ export default function POSPage() {
                             <p className="text-sm text-gray-600 mb-2">{formatPrice(item.price)} each</p>
                             
                             {/* Mobile Quantity Controls */}
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center space-x-1 bg-white rounded-lg border border-gray-200">
                                 <button
                                   onClick={(e) => {
@@ -943,9 +1041,39 @@ export default function POSPage() {
                                 </button>
                               </div>
                               
-                              <span className="font-bold text-green-600">
-                                {formatPrice(item.price * item.quantity)}
-                              </span>
+                              <div className="text-right">
+                                {item.discount > 0 ? (
+                                  <div className="space-y-1">
+                                    <span className="text-gray-400 line-through text-xs">{formatPrice(item.price * item.quantity)}</span>
+                                    <span className="font-bold text-green-600 text-sm">{formatPrice(cart.getItemSubtotal(item))}</span>
+                                  </div>
+                                ) : (
+                                  <span className="font-bold text-green-600">{formatPrice(item.price * item.quantity)}</span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Mobile Discount Control */}
+                            <div className="flex items-center space-x-2">
+                              <label className="text-xs text-gray-600">Discount:</label>
+                              <div className="flex items-center space-x-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.1"
+                                  value={item.discount || ''}
+                                  onChange={(e) => cart.updateItemDiscount(item.id, parseFloat(e.target.value) || 0)}
+                                  className="w-14 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-transparent"
+                                  placeholder="0"
+                                />
+                                <span className="text-xs text-gray-500">%</span>
+                                {item.discount > 0 && (
+                                  <span className="text-xs text-green-600 font-medium">
+                                    (-{formatPrice(cart.getItemDiscountAmount(item))})
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                           
@@ -974,14 +1102,80 @@ export default function POSPage() {
                       <span className="text-gray-600">Subtotal:</span>
                       <span className="font-medium">{formatPrice(cart.subtotal)}</span>
                     </div>
+                    {(cart.orderDiscountAmount > 0 || cart.items.some(item => item.discount > 0)) && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Discounts:</span>
+                        <span>-{formatPrice(cart.items.reduce((sum, item) => sum + cart.getItemDiscountAmount(item), 0) + cart.orderDiscountAmount)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Tax (8.875%):</span>
+                      <span className="text-gray-600">Tax ({settings?.taxRate || 0}%):</span>
                       <span className="font-medium">{formatPrice(cart.tax)}</span>
                     </div>
                     <div className="border-t border-gray-300 pt-2">
                       <div className="flex justify-between text-lg font-bold">
                         <span>Total:</span>
                         <span className="text-green-600">{formatPrice(cart.total)}</span>
+                      </div>
+                    </div>
+                    
+                    {/* Mobile Quick Order Discount Buttons */}
+                    <div className="pt-2 border-t border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-gray-600">Quick Discount:</span>
+                        {cart.orderDiscount > 0 && (
+                          <span className="text-xs text-green-600 font-medium">
+                            {cart.orderDiscount}% Applied
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {[5, 10, 15, 20].map((percentage) => (
+                          <button
+                            key={percentage}
+                            onClick={() => cart.updateOrderDiscount(percentage)}
+                            className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                              cart.orderDiscount === percentage
+                                ? 'bg-green-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {percentage}%
+                          </button>
+                        ))}
+                        {cart.orderDiscount > 0 && (
+                          <button
+                            onClick={() => cart.updateOrderDiscount(0)}
+                            className="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Mobile Custom Discount Input */}
+                      <div className="flex items-center space-x-2">
+                        <label className="text-xs text-gray-600 font-medium">Custom:</label>
+                        <div className="flex items-center space-x-1 flex-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={cart.orderDiscount || ''}
+                            onChange={(e) => cart.updateOrderDiscount(parseFloat(e.target.value) || 0)}
+                            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500 focus:border-transparent"
+                            placeholder="Enter % discount"
+                          />
+                          <span className="text-xs text-gray-500">%</span>
+                          <button
+                            onClick={() => cart.updateOrderDiscount(0)}
+                            className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors"
+                            title="Clear discount"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

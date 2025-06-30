@@ -9,6 +9,7 @@ const orderItemSchema = z.object({
   itemId: z.string(),
   quantity: z.number().min(1),
   price: z.number().min(0),
+  discount: z.number().min(0).max(100).default(0), // Individual item discount percentage
 })
 
 const orderSchema = z.object({
@@ -118,12 +119,19 @@ export async function POST(request: NextRequest) {
         notes,
         userId: userId || auth.user.id,
         orderItems: {
-          create: items.map((item: any) => ({
-            itemId: item.itemId,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.price * item.quantity,
-          })),
+          create: items.map((item: any) => {
+            const baseAmount = item.price * item.quantity
+            const discountAmount = baseAmount * ((item.discount || 0) / 100)
+            const itemSubtotal = baseAmount - discountAmount
+            
+            return {
+              itemId: item.itemId,
+              quantity: item.quantity,
+              price: item.price,
+              discount: item.discount || 0,
+              subtotal: itemSubtotal,
+            }
+          }),
         },
       },
       include: {

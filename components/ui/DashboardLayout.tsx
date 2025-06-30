@@ -3,7 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import ConnectionStatus from './ConnectionStatus'
+
 import Navigation from './Navigation'
 
 interface DashboardLayoutProps {
@@ -59,7 +59,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </div>
       </main>
-      <ConnectionStatus />
+      
     </div>
   )
 } 

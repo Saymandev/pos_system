@@ -3,7 +3,7 @@
 import { useSettings } from '@/contexts/SettingsContext'
 import { useSystemPreferences } from '@/lib/useSystemPreferences'
 import { formatPrice } from '@/lib/utils'
-import { BanknotesIcon, ClockIcon, CreditCardIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { BanknotesIcon, ClockIcon, CreditCardIcon, PercentBadgeIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useState } from 'react'
 import InvoiceModal from './InvoiceModal'
 
@@ -12,6 +12,7 @@ interface CartItem {
   name: string
   price: number
   quantity: number
+  discount: number
   category: {
     name: string
     color: string
@@ -22,8 +23,14 @@ interface Cart {
   items: CartItem[]
   subtotal: number
   tax: number
+  orderDiscount: number
+  orderDiscountAmount: number
   total: number
   processOrder: (paymentType: 'CASH' | 'CARD' | 'DUE', notes?: string) => Promise<any>
+  updateItemDiscount: (id: string, discount: number) => void
+  updateOrderDiscount: (discount: number) => void
+  getItemSubtotal: (item: CartItem) => number
+  getItemDiscountAmount: (item: CartItem) => number
 }
 
 interface PaymentModalProps {
@@ -66,6 +73,7 @@ export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalP
   const [isProcessing, setIsProcessing] = useState(false)
   const [showInvoice, setShowInvoice] = useState(false)
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null)
+  const [showDiscounts, setShowDiscounts] = useState(false)
   const { settings } = useSettings()
   const { shouldAutoPrint, showErrorNotification, showLoadingNotification, showSuccessNotification } = useSystemPreferences()
 
@@ -94,6 +102,16 @@ export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalP
     }
   }
 
+  const handleItemDiscountChange = (itemId: string, discount: string) => {
+    const numericDiscount = parseFloat(discount) || 0
+    cart.updateItemDiscount(itemId, numericDiscount)
+  }
+
+  const handleOrderDiscountChange = (discount: string) => {
+    const numericDiscount = parseFloat(discount) || 0
+    cart.updateOrderDiscount(numericDiscount)
+  }
+
   const paymentOptions = [
     {
       type: 'CASH' as const,
@@ -118,9 +136,11 @@ export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalP
     }
   ]
 
+  const totalDiscountAmount = cart.items.reduce((sum, item) => sum + cart.getItemDiscountAmount(item), 0) + cart.orderDiscountAmount
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col transform transition-all">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col transform transition-all">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-2xl font-bold text-gray-900">Complete Payment</h2>
@@ -137,28 +157,139 @@ export default function PaymentModal({ cart, onClose, onSuccess }: PaymentModalP
           <div className="p-6 space-y-6">
             {/* Order Summary */}
             <div className="bg-gray-50 rounded-xl p-4">
-              <h3 className="font-semibold text-gray-900 mb-3">Order Summary</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-gray-900">Order Summary</h3>
+                <button
+                  onClick={() => setShowDiscounts(!showDiscounts)}
+                  className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  <PercentBadgeIcon className="w-4 h-4" />
+                  <span>{showDiscounts ? 'Hide' : 'Add'} Discounts</span>
+                </button>
+              </div>
               
-              {/* Scrollable items list if many items */}
-              <div className={`space-y-2 ${cart.items.length > 5 ? 'max-h-32 overflow-y-auto scrollbar-thin pr-2' : ''}`}>
+              {/* Items List */}
+              <div className={`space-y-3 ${cart.items.length > 5 ? 'max-h-40 overflow-y-auto scrollbar-thin pr-2' : ''}`}>
                 {cart.items.map((item) => (
-                  <div key={item.id} className="flex justify-between text-sm">
-                    <span className="flex-1 truncate">{item.quantity}x {item.name}</span>
-                    <span className="font-medium ml-2">{formatPrice(item.price * item.quantity)}</span>
+                  <div key={item.id} className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="flex-1 truncate font-medium">{item.quantity}x {item.name}</span>
+                      <div className="text-right">
+                        {item.discount > 0 ? (
+                          <div className="space-y-1">
+                            <span className="text-gray-400 line-through text-xs">{formatPrice(item.price * item.quantity)}</span>
+                            <span className="font-medium text-green-600">{formatPrice(cart.getItemSubtotal(item))}</span>
+                          </div>
+                        ) : (
+                          <span className="font-medium">{formatPrice(item.price * item.quantity)}</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Individual Item Discount */}
+                    {showDiscounts && (
+                      <div className="flex items-center space-x-2 ml-4">
+                        <label className="text-xs text-gray-600 w-16">Discount:</label>
+                        <div className="flex items-center space-x-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={item.discount || ''}
+                            onChange={(e) => handleItemDiscountChange(item.id, e.target.value)}
+                            className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="0"
+                          />
+                          <span className="text-xs text-gray-500">%</span>
+                          {item.discount > 0 && (
+                            <span className="text-xs text-green-600 font-medium">
+                              (-{formatPrice(cart.getItemDiscountAmount(item))})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
               
-              <div className="border-t border-gray-200 mt-3 pt-3 space-y-1">
+              {/* Order-Level Discount */}
+              {showDiscounts && (
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-gray-700">Order Discount:</label>
+                    
+                    {/* Quick Discount Buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      {[5, 10, 15, 20, 25].map((percentage) => (
+                        <button
+                          key={percentage}
+                          onClick={() => handleOrderDiscountChange(percentage.toString())}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                            cart.orderDiscount === percentage
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {percentage}% OFF
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => handleOrderDiscountChange('0')}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                          cart.orderDiscount === 0
+                            ? 'bg-red-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    
+                    {/* Custom Discount Input */}
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm text-gray-600 w-16">Custom:</label>
+                      <div className="flex items-center space-x-1">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={cart.orderDiscount || ''}
+                          onChange={(e) => handleOrderDiscountChange(e.target.value)}
+                          className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="0"
+                        />
+                        <span className="text-sm text-gray-500">%</span>
+                        {cart.orderDiscount > 0 && (
+                          <span className="text-sm text-green-600 font-medium">
+                            (-{formatPrice(cart.orderDiscountAmount)})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Totals */}
+              <div className="border-t border-gray-200 mt-4 pt-3 space-y-1">
                 <div className="flex justify-between text-sm">
                   <span>Subtotal:</span>
                   <span>{formatPrice(cart.subtotal)}</span>
                 </div>
+                {totalDiscountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Total Discounts:</span>
+                    <span>-{formatPrice(totalDiscountAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span>Tax:</span>
                   <span>{formatPrice(cart.tax)}</span>
                 </div>
-                <div className="flex justify-between font-bold text-lg">
+                <div className="flex justify-between font-bold text-lg pt-1 border-t border-gray-300">
                   <span>Total:</span>
                   <span className="text-green-600">{formatPrice(cart.total)}</span>
                 </div>

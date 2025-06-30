@@ -84,6 +84,7 @@ model OrderItem {
   id       String @id @default(cuid())
   quantity Int
   price    Float
+  discount Float  @default(0) // Individual item discount percentage
   subtotal Float
   orderId  String
   itemId   String
