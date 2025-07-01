@@ -139,8 +139,14 @@ export default function ItemModal({ item, categories, onSave, onClose }: ItemMod
           const result = await response.json()
           setFormData(prev => ({ ...prev, image: result.imageUrl }))
         } else {
-          const error = await response.json()
-          throw new Error(error.error || 'Upload failed')
+          let errorMessage = 'Upload failed'
+          try {
+            const error = await response.json()
+            errorMessage = error.error || errorMessage
+          } catch (parseError) {
+            errorMessage = `${response.status} ${response.statusText || 'Upload failed'}`
+          }
+          throw new Error(errorMessage)
         }
       } catch (error: any) {
         console.error('Error uploading image:', error)

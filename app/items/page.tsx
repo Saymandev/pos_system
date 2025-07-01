@@ -228,7 +228,7 @@ export default function ItemsPage() {
   const handleSaveItem = async (itemData: any) => {
     try {
       const url = editingItem ? `/api/items/${editingItem.id}` : '/api/items'
-      const method = editingItem ? 'PUT' : 'POST'
+      const method = editingItem ? 'PATCH' : 'POST'
 
       const response = await fetch(url, {
         method,
@@ -248,8 +248,15 @@ export default function ItemsPage() {
         setShowModal(false)
         setEditingItem(null)
       } else {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to save item')
+        let errorMessage = 'Failed to save item'
+        try {
+          const error = await response.json()
+          errorMessage = error.error || errorMessage
+        } catch (parseError) {
+          // If response is not JSON, use status text
+          errorMessage = `${response.status} ${response.statusText || 'Unknown error'}`
+        }
+        throw new Error(errorMessage)
       }
     } catch (error: any) {
       showErrorNotification(error.message)
@@ -271,7 +278,14 @@ export default function ItemsPage() {
         setItems(items.map(i => i.id === updatedItem.id ? updatedItem : i))
         toast.success(`Item ${updatedItem.isAvailable ? 'enabled' : 'disabled'}`)
       } else {
-        throw new Error('Failed to update item')
+        let errorMessage = 'Failed to update item'
+        try {
+          const error = await response.json()
+          errorMessage = error.error || errorMessage
+        } catch (parseError) {
+          errorMessage = `${response.status} ${response.statusText || 'Unknown error'}`
+        }
+        throw new Error(errorMessage)
       }
     } catch (error: any) {
       toast.error(error.message)
