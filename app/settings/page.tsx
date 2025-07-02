@@ -3,8 +3,8 @@
 import DashboardLayout from '@/components/ui/DashboardLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSettings } from '@/contexts/SettingsContext'
-import { BellIcon, BuildingStorefrontIcon, CloudArrowDownIcon, Cog6ToothIcon, CurrencyDollarIcon, ShieldCheckIcon } from '@heroicons/react/24/outline'
-import { useEffect, useState } from 'react'
+import { BellIcon, BuildingStorefrontIcon, CloudArrowDownIcon, Cog6ToothIcon, CurrencyDollarIcon, PhotoIcon, ShieldCheckIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'react-hot-toast'
 
 export default function SettingsPage() {
@@ -45,6 +45,17 @@ export default function SettingsPage() {
     requireConfirmation: true,
   })
 
+  const [logoSettings, setLogoSettings] = useState({
+    logo: '',
+    companySlogan: '',
+    brandColors: {
+      primary: '#3B82F6',
+      secondary: '#6B7280',
+    }
+  })
+
+  const logoFileInputRef = useRef<HTMLInputElement>(null)
+
   // Currency is now automatically updated in SettingsContext
 
   // Initialize form with settings data
@@ -79,6 +90,15 @@ export default function SettingsPage() {
         printReceipts: settings.printReceipts,
         requireConfirmation: settings.requireConfirmation,
       })
+
+      setLogoSettings({
+        logo: settings.logo || '',
+        companySlogan: settings.companySlogan || '',
+        brandColors: {
+          primary: settings.primaryColor || '#3B82F6',
+          secondary: settings.secondaryColor || '#6B7280',
+        }
+      })
     }
   }, [settings])
 
@@ -101,15 +121,49 @@ export default function SettingsPage() {
   const handleSaveSection = async (section: string, data: any) => {
     setIsSaving(true)
     try {
+      console.log(`Saving ${section} with data:`, data)
       await updateSettings(data)
       // Update global currency immediately if currency was changed
       if (data.currency) {
         // Currency is automatically set in SettingsContext
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error saving ${section}:`, error)
+      toast.error(`Failed to save ${section}: ${error.message || 'Unknown error'}`)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+        
+        if (response.ok) {
+          const result = await response.json()
+          setLogoSettings(prev => ({ ...prev, logo: result.imageUrl }))
+          toast.success('Logo uploaded successfully!')
+        } else {
+          throw new Error('Failed to upload logo')
+        }
+      } catch (error) {
+        toast.error('Failed to upload logo')
+      }
+    }
+  }
+
+  const handleRemoveLogo = () => {
+    setLogoSettings(prev => ({ ...prev, logo: '' }))
+    if (logoFileInputRef.current) {
+      logoFileInputRef.current.value = ''
     }
   }
 
@@ -274,6 +328,166 @@ export default function SettingsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Logo & Branding */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center mb-6">
+              <PhotoIcon className="w-6 h-6 text-indigo-600 mr-3" />
+              <h2 className="text-xl font-bold text-gray-900">Logo & Branding</h2>
+            </div>
+
+            <div className="space-y-4">
+              {/* Logo Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
+                
+                {logoSettings.logo ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={logoSettings.logo}
+                      alt="Company Logo"
+                      className="w-32 h-32 object-contain rounded-lg border border-gray-300 bg-gray-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => logoFileInputRef.current?.click()}
+                    className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 transition-colors"
+                  >
+                    <PhotoIcon className="w-8 h-8 text-gray-400 mb-2" />
+                    <p className="text-xs text-gray-600 text-center">
+                      Click to upload<br />
+                      <span className="text-xs">PNG, JPG up to 5MB</span>
+                    </p>
+                  </div>
+                )}
+
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+
+                {!logoSettings.logo && (
+                  <button
+                    type="button"
+                    onClick={() => logoFileInputRef.current?.click()}
+                    className="mt-2 w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                  >
+                    Choose Logo
+                  </button>
+                )}
+              </div>
+
+              {/* Company Slogan */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company Slogan</label>
+                <input
+                  type="text"
+                  value={logoSettings.companySlogan}
+                  onChange={(e) => setLogoSettings(prev => ({ ...prev, companySlogan: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="Your company slogan..."
+                  maxLength={100}
+                />
+              </div>
+
+              {/* Brand Colors */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Brand Colors</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Primary Color</label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="color"
+                        value={logoSettings.brandColors.primary}
+                        onChange={(e) => setLogoSettings(prev => ({ 
+                          ...prev, 
+                          brandColors: { ...prev.brandColors, primary: e.target.value }
+                        }))}
+                        className="w-10 h-8 border border-gray-300 rounded cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={logoSettings.brandColors.primary}
+                        onChange={(e) => setLogoSettings(prev => ({ 
+                          ...prev, 
+                          brandColors: { ...prev.brandColors, primary: e.target.value }
+                        }))}
+                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Secondary Color</label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="color"
+                        value={logoSettings.brandColors.secondary}
+                        onChange={(e) => setLogoSettings(prev => ({ 
+                          ...prev, 
+                          brandColors: { ...prev.brandColors, secondary: e.target.value }
+                        }))}
+                        className="w-10 h-8 border border-gray-300 rounded cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={logoSettings.brandColors.secondary}
+                        onChange={(e) => setLogoSettings(prev => ({ 
+                          ...prev, 
+                          brandColors: { ...prev.brandColors, secondary: e.target.value }
+                        }))}
+                        className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logo Preview */}
+              {logoSettings.logo && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <label className="block text-xs font-medium text-gray-600 mb-2">Preview</label>
+                  <div className="flex items-center space-x-3">
+                    <img
+                      src={logoSettings.logo}
+                      alt="Logo Preview"
+                      className="w-12 h-12 object-contain"
+                    />
+                    <div>
+                      <div className="font-medium text-gray-900">{restaurantInfo.restaurantName || 'Your Restaurant'}</div>
+                      {logoSettings.companySlogan && (
+                        <div className="text-sm text-gray-600">{logoSettings.companySlogan}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => handleSaveSection('Logo & Branding', {
+                  logo: logoSettings.logo,
+                  companySlogan: logoSettings.companySlogan,
+                  primaryColor: logoSettings.brandColors.primary,
+                  secondaryColor: logoSettings.brandColors.secondary,
+                })}
+                disabled={isSaving}
+                className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? 'Saving...' : 'Save Branding'}
+              </button>
+            </div>
+          </div>
+
           {/* Restaurant Information */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center mb-6">

@@ -137,6 +137,12 @@ model Settings {
   printReceipts      Boolean  @default(true)
   requireConfirmation Boolean @default(true)
   
+  // Logo & Branding
+  logo               String?
+  companySlogan      String?
+  primaryColor       String?  @default("#3B82F6")
+  secondaryColor     String?  @default("#6B7280")
+  
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

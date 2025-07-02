@@ -30,7 +30,15 @@ export async function PATCH(
 
     if (!currentItem) {
       return NextResponse.json(
-        { error: 'Item not found' },
+        { 
+          error: 'Item not found',
+          details: {
+            message: 'This item no longer exists in the system. It may have been deleted by another user while you were viewing this page.',
+            itemId: params.id,
+            actionTaken: 'The item cannot be updated.',
+            suggestion: 'Please refresh the page to see the current items list.'
+          }
+        },
         { status: 404 }
       )
     }
@@ -116,7 +124,15 @@ export async function DELETE(
 
     if (!item) {
       return NextResponse.json(
-        { error: 'Item not found' },
+        { 
+          error: 'Item not found',
+          details: {
+            message: 'This item no longer exists in the system. It may have been deleted by another user while you were viewing this page.',
+            itemId: params.id,
+            actionTaken: 'The item has been removed from your current view.',
+            suggestion: 'No action needed - the item list has been automatically updated.'
+          }
+        },
         { status: 404 }
       )
     }

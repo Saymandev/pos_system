@@ -46,8 +46,33 @@ const PrintableInvoice = ({ order, settings }: { order: Order, settings: any }) 
     <div className="bg-white p-6 max-w-sm mx-auto" style={{ width: '80mm', fontFamily: 'monospace' }}>
       {/* Header */}
       <div className="text-center border-b-2 border-dashed border-gray-400 pb-4 mb-4">
-        <h1 className="text-lg font-bold">{settings?.restaurantName || 'Restaurant POS'}</h1>
-        <div className="text-xs mt-1">
+        {/* Logo */}
+        {settings?.logo && (
+          <div className="mb-3 flex justify-center">
+            <img 
+              src={settings.logo} 
+              alt="Restaurant Logo" 
+              className="max-h-16 max-w-20 object-contain"
+              style={{ maxHeight: '64px', maxWidth: '80px' }}
+            />
+          </div>
+        )}
+        
+        <h1 
+          className="text-lg font-bold"
+          style={{ 
+            color: settings?.primaryColor || '#000000'
+          }}
+        >
+          {settings?.restaurantName || 'Restaurant POS'}
+        </h1>
+        
+        {/* Company Slogan */}
+        {settings?.companySlogan && (
+          <p className="text-xs italic text-gray-600 mt-1">{settings.companySlogan}</p>
+        )}
+        
+        <div className="text-xs mt-2">
           <p>{settings?.address || '123 Main Street'}</p>
           <p>{settings?.city || 'New York'}, {settings?.state || 'NY'} {settings?.zipCode || '10001'}</p>
           <p>Tel: {settings?.phone || '(555) 123-4567'}</p>
@@ -112,7 +137,12 @@ const PrintableInvoice = ({ order, settings }: { order: Order, settings: any }) 
             <span>-{formatPrice(order.discount)}</span>
           </div>
         )}
-        <div className="flex justify-between font-bold text-sm mt-1 pt-1 border-t border-gray-300">
+        <div 
+          className="flex justify-between font-bold text-sm mt-1 pt-1 border-t border-gray-300"
+          style={{ 
+            color: settings?.primaryColor || '#000000'
+          }}
+        >
           <span>TOTAL:</span>
           <span>{formatPrice(order.total)}</span>
         </div>
@@ -177,6 +207,26 @@ export default function InvoiceModal({ order, onClose, autoPrint = false }: Invo
           padding: 20px; 
           font-family: 'Courier New', monospace; 
         }
+        /* Ensure logo prints properly */
+        #print-content img {
+          max-height: 64px;
+          max-width: 80px;
+          -webkit-print-color-adjust: exact;
+          color-adjust: exact;
+        }
+                 /* Print colors for brand elements */
+         #print-content .text-gray-600 {
+           color: #4b5563 !important;
+         }
+         #print-content .text-green-600 {
+           color: #059669 !important;
+         }
+         /* Ensure brand colors print */
+         #print-content h1,
+         #print-content .total-amount {
+           -webkit-print-color-adjust: exact;
+           color-adjust: exact;
+         }
       }
     `
     document.head.appendChild(printStyles)

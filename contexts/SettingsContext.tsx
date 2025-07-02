@@ -33,6 +33,12 @@ interface Settings {
   printReceipts: boolean
   requireConfirmation: boolean
   
+  // Logo & Branding
+  logo?: string
+  companySlogan?: string
+  primaryColor?: string
+  secondaryColor?: string
+  
   // Metadata
   createdAt?: string
   updatedAt?: string
@@ -67,6 +73,10 @@ const defaultSettings: Settings = {
   autoBackup: true,
   printReceipts: true,
   requireConfirmation: true,
+  logo: '',
+  companySlogan: '',
+  primaryColor: '#3B82F6',
+  secondaryColor: '#6B7280',
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined)
@@ -118,7 +128,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
         toast.success('Settings saved successfully!')
       } else {
-        throw new Error('Failed to save settings')
+        const errorData = await response.json()
+        const errorMessage = errorData.details || errorData.error || 'Failed to save settings'
+        throw new Error(errorMessage)
       }
     } catch (error: any) {
       console.error('Error saving settings:', error)

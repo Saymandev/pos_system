@@ -34,27 +34,37 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json()
+    console.log('Received settings data:', data)
 
     // Get or create settings
     let settings = await db.settings.findFirst()
     
     if (!settings) {
+      console.log('Creating new settings with data:', data)
       settings = await db.settings.create({
         data: data
       })
     } else {
+      console.log('Updating existing settings with data:', data)
       settings = await db.settings.update({
         where: { id: settings.id },
         data: data
       })
     }
 
+    console.log('Settings saved successfully:', settings)
+
     // Emit real-time event for settings update
     emitToPosUsers('settingsUpdated', settings)
 
     return NextResponse.json(settings)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error saving settings:', error)
-    return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
+    console.error('Error details:', error.message)
+    console.error('Stack trace:', error.stack)
+    return NextResponse.json({ 
+      error: 'Failed to save settings',
+      details: error.message 
+    }, { status: 500 })
   }
 } 

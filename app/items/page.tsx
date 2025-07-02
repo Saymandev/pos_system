@@ -164,6 +164,11 @@ export default function ItemsPage() {
   }
 
   const handleDeleteItem = (item: Item) => {
+    if (!item || !item.id) {
+      showErrorNotification('Cannot delete item: Invalid item data')
+      return
+    }
+    
     if (requiresConfirmation()) {
       setDeletingItem(item)
     } else {
@@ -172,8 +177,15 @@ export default function ItemsPage() {
     }
   }
 
-  const confirmDelete = async (itemToDelete = deletingItem, force = false, deactivate = false) => {
-    if (!itemToDelete) return
+    const confirmDelete = async (itemToDelete = deletingItem, force = false, deactivate = false) => {
+    if (!itemToDelete) {
+      return
+    }
+      
+    if (!itemToDelete.id) {
+      showErrorNotification('Cannot delete item: Invalid item ID')
+      return
+    }
 
     try {
       let url = `/api/items/${itemToDelete.id}`
@@ -197,15 +209,51 @@ export default function ItemsPage() {
           showSuccessNotification(data.message || 'Item deleted successfully')
         }
       } else {
-        if (data.details && data.details.orderCount > 0) {
+        // Handle different error cases
+        if (data.error === 'Cannot delete item that has been ordered' && data.details && data.details.orderCount > 0) {
           // Show options dialog for items that have been ordered
           setShowDeleteOptions({
             item: itemToDelete,
             orderCount: data.details.orderCount
           })
           return
+        } else if (data.error === 'Item not found') {
+          // Handle detailed error information for not found items
+          let errorMessage = data.error || 'Failed to delete item'
+          if (data.details && data.details.message) {
+            errorMessage = data.details.message
+          }
+          
+          // Remove the item from local state since it doesn't exist on server
+          setItems(items.filter(i => i.id !== itemToDelete.id))
+          
+          // Show a more user-friendly message
+          const itemName = itemToDelete?.name || 'Unknown item'
+          const userFriendlyMessage = `"${itemName}" was already deleted from the system. ${data.details?.actionTaken || 'The item has been removed from your view.'}`
+          
+          showErrorNotification(
+            userFriendlyMessage,
+            { 
+              duration: 6000,
+              icon: 'ℹ️'
+            }
+          )
+          return
         } else {
-          throw new Error(data.error || 'Failed to delete item')
+          // Handle other errors
+          let errorMessage = data.error || 'Failed to delete item'
+          if (data.details && data.details.message) {
+            errorMessage = data.details.message
+          }
+          
+          showErrorNotification(
+            `Delete failed: ${errorMessage}`,
+            { 
+              duration: 6000,
+              icon: '❌'
+            }
+          )
+          return
         }
       }
     } catch (error: any) {
@@ -251,6 +299,27 @@ export default function ItemsPage() {
         let errorMessage = 'Failed to save item'
         try {
           const error = await response.json()
+          
+          // Handle "Item not found" specifically for edit operations
+          if (error.error === 'Item not found' && editingItem) {
+            // Remove the item from local state since it doesn't exist on server
+            setItems(items.filter(i => i.id !== editingItem.id))
+            setShowModal(false)
+            setEditingItem(null)
+            
+            const itemName = editingItem?.name || 'Unknown item'
+            const userFriendlyMessage = `"${itemName}" was already deleted from the system. ${error.details?.actionTaken || 'The item has been removed from your view.'}`
+            
+            showErrorNotification(
+              userFriendlyMessage,
+              { 
+                duration: 6000,
+                icon: 'ℹ️'
+              }
+            )
+            return
+          }
+          
           errorMessage = error.error || errorMessage
         } catch (parseError) {
           // If response is not JSON, use status text
@@ -837,7 +906,7 @@ export default function ItemsPage() {
         <DeleteConfirmModal
           title="Delete Item"
           message={`Are you sure you want to delete "${deletingItem.name}"? This action cannot be undone.`}
-          onConfirm={confirmDelete}
+          onConfirm={() => confirmDelete()}
           onCancel={() => setDeletingItem(null)}
         />
       )}
